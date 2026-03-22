@@ -83,3 +83,5 @@ For each locale, ask:
 2. Show the resolved YAML.
 3. Run `pipeline:plan` semantics: variant count, job count, credits needed.
 4. Wait for explicit approval before `pipeline:run`.
+
+For config schema details and legacy compatibility, see `SKILL.md`.
