@@ -2,17 +2,33 @@ import { mkdir, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { remotionRoot } from "./paths";
 import { runCommand } from "./subprocess";
-import type { GeneratedClipConfig, ProjectConfig, SupportedAspectRatio } from "./types";
+import type {
+  GeneratedClipConfig,
+  ProjectConfig,
+  ReferenceClipConfig,
+  SupportedAspectRatio,
+} from "./types";
 
 const pixverseBinary = () => process.env.PIXVERSE_BIN?.trim() || "pixverse";
 
-const parseJson = (stdout: string): Record<string, unknown> => {
+export const parseJsonOutput = (stdout: string): Record<string, unknown> => {
   const trimmed = stdout.trim();
   if (!trimmed) {
     return {};
   }
 
-  return JSON.parse(trimmed) as Record<string, unknown>;
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    const lines = trimmed.split("\n");
+    const jsonStart = lines.findIndex((line) => line.trim().startsWith("{"));
+
+    if (jsonStart === -1) {
+      throw new Error(`PixVerse response did not contain JSON: ${trimmed}`);
+    }
+
+    return JSON.parse(lines.slice(jsonStart).join("\n")) as Record<string, unknown>;
+  }
 };
 
 const extractVideoId = (payload: Record<string, unknown>): string => {
@@ -29,7 +45,7 @@ const runPixverse = async (args: string[]): Promise<Record<string, unknown>> => 
     captureOutput: true,
     cwd: remotionRoot,
   });
-  return parseJson(stdout);
+  return parseJsonOutput(stdout);
 };
 
 export const getAvailableCredits = async (): Promise<number> => {
@@ -101,13 +117,43 @@ export const createBaseVideo = async (
   return extractVideoId(payload);
 };
 
+export const createReferenceVideo = async ({
+  aspectRatio,
+  clip,
+  config,
+}: {
+  aspectRatio: SupportedAspectRatio;
+  clip: ReferenceClipConfig;
+  config: ProjectConfig;
+}): Promise<string> => {
+  const payload = await runPixverse([
+    "create",
+    "reference",
+    "--images",
+    ...config.speaker.images,
+    "--prompt",
+    clip.prompt,
+    "--model",
+    config.generation.model,
+    "--quality",
+    config.generation.quality,
+    "--duration",
+    String(Math.max(1, Math.round(clip.durationSeconds))),
+    "--aspect-ratio",
+    aspectRatio,
+    "--no-wait",
+  ]);
+
+  return extractVideoId(payload);
+};
+
 export const waitForTask = async (videoId: string): Promise<void> => {
   await runPixverse(["task", "wait", videoId]);
 };
 
 export const createSpeech = async (
   baseVideoId: string,
-  clip: GeneratedClipConfig,
+  clip: GeneratedClipConfig | ReferenceClipConfig,
 ): Promise<string> => {
   const args = ["create", "speech", "--video", baseVideoId];
 

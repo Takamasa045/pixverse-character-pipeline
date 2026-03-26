@@ -1,0 +1,45 @@
+project:
+  slug: reference-story-fixture
+  title: Reference Story Fixture
+  date: "2026-03-26"
+
+speaker:
+  name: Story Guide
+  images:
+    - ../shared/assets/speaker.svg
+  mode: single
+
+locales:
+  en:
+    theme:
+      background: "#120f1d"
+      accent: "#8b5cf6"
+      text: "#ffffff"
+    clips:
+      - id: hook
+        source: reference
+        prompt: A mysterious guide steps out into a moonlit shrine courtyard, cloth swaying softly, subtle purple light in the fog, slow push in, vertical portrait framing.
+        text: A presence awakens in the shrine.
+        ttsSpeaker: 1
+        durationSeconds: 3
+        overlayText: A presence awakens
+        overlayStyle: subtitle
+      - id: reveal
+        source: reference
+        prompt: The same guide turns toward camera near a torii gate, magical light rippling behind them, gentle orbit shot, vertical portrait framing.
+        durationSeconds: 4
+        overlayText: The gate begins to open
+        overlayStyle: subtitle
+
+render:
+  aspectRatios: ["9:16"]
+  fps: 30
+  outputDir: ../../output
+
+generation:
+  model: v5.6
+  quality: 1080p
+  upscale: false
+  ambientSound: null
+  prompt:
+    base: Reference story fixture prompt

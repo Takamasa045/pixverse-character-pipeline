@@ -2,6 +2,11 @@
 
 When `project.yaml` is not provided, collect inputs in this order and convert them into the neutral schema. Do not start generation during Q&A.
 
+If the user asks for a story, teaser, trailer, or multi-cut video, default to a reference-driven per-cut workflow:
+- draft 3-5 story beats first
+- generate each beat as its own reference clip
+- write the result into `project.yaml` as `source: reference` clips unless the user already has local rendered assets
+
 ## Group 1: Project
 
 **Ask**
@@ -36,6 +41,9 @@ For each locale, ask:
 
 > List the clips in order. For each clip, tell me whether it is `generated`, `video`, or `image`.
 
+Story-mode default:
+> If the user clearly wants a story or teaser but did not specify clips, propose 3-5 beats first and ask for corrections instead of asking them to invent clip types from scratch.
+
 **Extract**
 - `locales.<lang>.clips[].id`
 - `locales.<lang>.clips[].source`
@@ -44,6 +52,11 @@ For each locale, ask:
 - `locales.<lang>.clips[].asset` for `video` / `image`
 - `locales.<lang>.clips[].overlayText`
 - `locales.<lang>.clips[].overlayStyle`
+
+For story-mode, also extract:
+- each beat's role (`hook`, `reveal`, `conflict`, `payoff`, `endcard`)
+- per-beat camera distinction
+- whether the final `project.yaml` should stay `source: reference` or be converted to local `video` clips
 
 ## Group 5: Render Settings
 

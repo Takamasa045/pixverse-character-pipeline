@@ -33,6 +33,16 @@ const asString = (value: unknown): string | undefined =>
 const asNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
+const asUnitVolume = (value: unknown): number | undefined => {
+  const parsed = asNumber(value);
+
+  if (parsed === undefined) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.min(1, parsed));
+};
+
 const asBoolean = (value: unknown): boolean | undefined =>
   typeof value === "boolean" ? value : undefined;
 
@@ -74,17 +84,46 @@ const normalizeGeneratedClip = (
   value: Record<string, unknown>,
   configDir: string,
   defaults: { durationSeconds: number },
-): ClipConfig => ({
-  audioFile: resolveOptionalPath(configDir, value.audioFile),
-  durationSeconds: asNumber(value.durationSeconds) ?? defaults.durationSeconds,
-  hasAudio: asBoolean(value.hasAudio) ?? true,
-  id: asString(value.id) ?? "primary",
-  overlayStyle: asOverlayStyle(value.overlayStyle),
-  overlayText: asString(value.overlayText) ?? "",
-  source: "generated",
-  text: asString(value.text),
-  ttsSpeaker: asNumber(value.ttsSpeaker) ?? 1,
-});
+): ClipConfig => {
+  const audioVolume = asUnitVolume(value.audioVolume);
+
+  return {
+    audioFile: resolveOptionalPath(configDir, value.audioFile),
+    ...(audioVolume === undefined ? {} : { audioVolume }),
+    durationSeconds: asNumber(value.durationSeconds) ?? defaults.durationSeconds,
+    hasAudio: asBoolean(value.hasAudio) ?? true,
+    id: asString(value.id) ?? "primary",
+    overlayStyle: asOverlayStyle(value.overlayStyle),
+    overlayText: asString(value.overlayText) ?? "",
+    source: "generated",
+    text: asString(value.text),
+    ttsSpeaker: asNumber(value.ttsSpeaker) ?? 1,
+  };
+};
+
+const normalizeReferenceClip = (
+  value: Record<string, unknown>,
+  configDir: string,
+  defaults: { durationSeconds: number },
+): ClipConfig => {
+  const audioFile = resolveOptionalPath(configDir, value.audioFile);
+  const text = asString(value.text);
+  const audioVolume = asUnitVolume(value.audioVolume);
+
+  return {
+    audioFile,
+    ...(audioVolume === undefined ? {} : { audioVolume }),
+    durationSeconds: asNumber(value.durationSeconds) ?? defaults.durationSeconds,
+    hasAudio: asBoolean(value.hasAudio) ?? Boolean(audioFile || text),
+    id: asString(value.id) ?? "reference",
+    overlayStyle: asOverlayStyle(value.overlayStyle),
+    overlayText: asString(value.overlayText) ?? "",
+    prompt: asString(value.prompt) ?? "",
+    source: "reference",
+    text,
+    ttsSpeaker: asNumber(value.ttsSpeaker) ?? 1,
+  };
+};
 
 const normalizeAssetClip = (
   value: Record<string, unknown>,
@@ -93,9 +132,11 @@ const normalizeAssetClip = (
   source: "image" | "video",
 ): ClipConfig => {
   const asset = asString(value.asset);
+  const audioVolume = source === "video" ? asUnitVolume(value.audioVolume) : undefined;
 
   return {
     asset: asset ? resolvePathFromConfig(configDir, asset) : "",
+    ...(audioVolume === undefined ? {} : { audioVolume }),
     durationSeconds: asNumber(value.durationSeconds) ?? defaults.durationSeconds,
     hasAudio: source === "video" ? asBoolean(value.hasAudio) ?? false : false,
     id: asString(value.id) ?? `clip-${source}`,
@@ -118,6 +159,10 @@ const normalizeClip = (
 
   if (source === "generated") {
     return normalizeGeneratedClip(value, configDir, defaults);
+  }
+
+  if (source === "reference") {
+    return normalizeReferenceClip(value, configDir, defaults);
   }
 
   if (source === "video" || source === "image") {
@@ -373,9 +418,15 @@ export const validateProjectConfig = (config: ProjectConfig): void => {
         throw new Error(`Clip ${language}/${clip.id} must have a positive durationSeconds.`);
       }
 
-      if (clip.source === "generated") {
+      if (clip.source === "generated" || clip.source === "reference") {
+        if (clip.source === "reference" && !clip.prompt) {
+          throw new Error(`Reference clip ${language}/${clip.id} requires prompt.`);
+        }
+
         if (!clip.text && !clip.audioFile) {
-          throw new Error(`Generated clip ${language}/${clip.id} requires text or audioFile.`);
+          if (clip.source === "generated") {
+            throw new Error(`Generated clip ${language}/${clip.id} requires text or audioFile.`);
+          }
         }
 
         if (clip.audioFile && !existsSync(clip.audioFile)) {

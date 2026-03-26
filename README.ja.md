@@ -29,6 +29,11 @@ BGM は assets/bgm.mp3 を使ってください。
 ```
 
 ```text
+このキャラをリファレンスしてから、神社の夜を舞台に4カットの短いストーリー動画を作って。
+各カットは別シーンにして、最後にBGMとテロップを入れて。
+```
+
+```text
 既存の spokesperson.yaml を読み込んで、今の project.yaml 形式で実行して。
 最終的に render までやって。
 ```
@@ -50,7 +55,7 @@ BGM は assets/bgm.mp3 を使ってください。
   - テーマ色
   - BGM
 - `clips`
-  - `generated | video | image`
+  - `generated | reference | video | image`
   - クリップ順
   - テキスト、音声、素材パス
   - オーバーレイ文言
@@ -88,6 +93,14 @@ BGM は assets/bgm.mp3 を使ってください。
 5. ユーザーが確認優先なら `run --dry-run` を使う
 6. 実行許可があるなら `run` で PixVerse 生成から最終 render まで進める
 7. ローカル素材だけのときは `render` を使う
+
+ストーリー依頼の既定動作:
+
+1. 3-5 個のビートに分解する
+2. 各ビートを `pixverse create reference --images` で個別生成する
+3. 各カットに `pixverse create speech` を重ねる
+4. 各ビートを `source: reference` として `project.yaml` に書く
+5. 最後に `./bin/pipeline run` で reference 生成から BGM / テロップ込みの最終 render まで進める
 
 シェルの Node / PATH 解決が不安定な環境では、`pnpm pipeline:*` ではなく `./bin/pipeline` を正式入口として使います。
 
@@ -170,6 +183,14 @@ locales:
         durationSeconds: 5
         overlayText: 春のキャンペーン開始
         overlayStyle: title
+      - id: teaser-beat
+        source: reference
+        prompt: The same character from the reference image stands in a moonlit shrine courtyard, slow push in, vertical portrait framing.
+        text: 物語の扉が開く。
+        ttsSpeaker: 1
+        durationSeconds: 4
+        overlayText: 物語の扉が開く
+        overlayStyle: subtitle
       - id: endcard
         source: image
         asset: ./assets/endcard.png
@@ -191,7 +212,9 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を使って、キャラ画像から実写背景込みのシーンを生成します。
+PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を使って、キャラ画像から実写背景込みのシーンを生成します。`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。
+
+`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
 
 ## 出力
 
@@ -273,8 +296,20 @@ cd remotion
 ./bin/pipeline validate --config ../fixtures/generated/project.yaml
 ./bin/pipeline plan --config ../fixtures/generated/project.yaml
 ./bin/pipeline run --config ../fixtures/generated/project.yaml --dry-run
+./bin/pipeline story --image ../fixtures/shared/assets/speaker.svg --config-out ./story.yaml
 ./bin/pipeline render --config ../fixtures/basic/project.yaml --lang en --ratio 16:9
 ```
+
+- `validate`
+  - config を正規化して検証する
+- `plan`
+  - variant 数と job 数を見る
+- `run`
+  - PixVerse 生成から最終 MP4 まで進める
+- `story`
+  - 対話で reference ストーリー用の `project.yaml` を作り、そのまま `dry-run` / `run` に進められる
+- `render`
+  - ローカル素材だけで 1 variant をレンダリングする
 
 ## Fixtures / Tests
 
@@ -282,6 +317,8 @@ cd remotion
   - ローカル `video` + `image` の render smoke 用
 - `fixtures/generated/project.yaml`
   - generated / video / image 混在の plan / dry-run 用
+- `fixtures/reference-story/project.yaml`
+  - per-cut `reference` ストーリー用
 - `fixtures/legacy/spokesperson.yaml`
   - 旧フォーマット互換テスト用
 

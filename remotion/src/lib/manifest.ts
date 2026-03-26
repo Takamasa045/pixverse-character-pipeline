@@ -29,6 +29,7 @@ export const buildRenderManifest = ({
     const publicPath = assets.clipAssetPublicPaths[clip.id] ?? null;
 
     const cut = {
+      audioVolume: clip.source === "image" ? undefined : clip.audioVolume,
       durationInFrames,
       hasAudio: clip.source === "image" ? false : clip.hasAudio ?? clip.source === "generated",
       id: clip.id,

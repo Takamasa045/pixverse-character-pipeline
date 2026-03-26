@@ -2,10 +2,11 @@ import { describeConfigForCli, loadProjectConfig } from "../lib/config";
 import { getErrorMessage } from "../lib/helpers";
 import { executePipeline } from "../lib/pipeline";
 import { buildPipelinePlan } from "../lib/planner";
+import { runStoryWizard } from "../lib/story";
 import type { SupportedAspectRatio } from "../lib/types";
 
 type ParsedArgs = {
-  command: "plan" | "render" | "run" | "validate";
+  command: "plan" | "render" | "run" | "story" | "validate";
   options: Record<string, string | boolean>;
 };
 
@@ -16,7 +17,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     commandRaw !== "validate" &&
     commandRaw !== "plan" &&
     commandRaw !== "run" &&
-    commandRaw !== "render"
+    commandRaw !== "render" &&
+    commandRaw !== "story"
   ) {
     throw new Error(`Unknown command: ${commandRaw ?? "(missing)"}`);
   }
@@ -67,6 +69,18 @@ const optionalRatio = (
 
 const main = async (): Promise<void> => {
   const parsed = parseArgs(process.argv.slice(2));
+
+  if (parsed.command === "story") {
+    await runStoryWizard({
+      configOut: typeof parsed.options["config-out"] === "string" ? parsed.options["config-out"] : undefined,
+      dryRun: parsed.options["dry-run"] === true,
+      image: typeof parsed.options.image === "string" ? parsed.options.image : undefined,
+      images: typeof parsed.options.images === "string" ? parsed.options.images : undefined,
+      run: parsed.options.run === true,
+    });
+    return;
+  }
+
   const configPath = requiredOption(parsed.options, "config");
   const loaded = await loadProjectConfig(configPath);
 

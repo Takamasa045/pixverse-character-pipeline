@@ -37,6 +37,27 @@ Character naturally composited into real photograph.
 A talking character derived from the provided character image, speaking directly to camera, [expression], [movement_style], [lighting], [background], [framing], [quality]
 ```
 
+### Phase 3 / Mode C: Per-Cut Reference Prompt
+
+ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。
+
+テンプレート:
+```
+[Scene setup]. The same character from the reference image [character action], [secondary motion], [background motion]. [Camera work], [framing], [lighting].
+```
+
+必須要素:
+- `"The same character from the reference image"` で参照対象を固定
+- 1カットにつき1つの明確な動きだけに絞る
+- 背景変化も1つ書く
+- カメラワークは毎カット変える
+
+4ビートの基本形:
+1. `hook` — 世界観と異変の導入
+2. `reveal` — キャラの正面登場
+3. `conflict` — 動きのピーク
+4. `payoff` — 引きや締め
+
 ---
 
 ## Camera Work Vocabulary

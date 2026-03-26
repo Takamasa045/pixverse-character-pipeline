@@ -10,6 +10,7 @@ export type Theme = {
 
 export type GeneratedClipConfig = {
   audioFile?: string | null;
+  audioVolume?: number;
   durationSeconds: number;
   hasAudio?: boolean;
   id: string;
@@ -20,8 +21,23 @@ export type GeneratedClipConfig = {
   ttsSpeaker?: number | null;
 };
 
+export type ReferenceClipConfig = {
+  audioFile?: string | null;
+  audioVolume?: number;
+  durationSeconds: number;
+  hasAudio?: boolean;
+  id: string;
+  overlayStyle?: OverlayStyle;
+  overlayText?: string;
+  prompt: string;
+  source: "reference";
+  text?: string;
+  ttsSpeaker?: number | null;
+};
+
 export type VideoClipConfig = {
   asset: string;
+  audioVolume?: number;
   durationSeconds: number;
   hasAudio?: boolean;
   id: string;
@@ -39,7 +55,11 @@ export type ImageClipConfig = {
   source: "image";
 };
 
-export type ClipConfig = GeneratedClipConfig | VideoClipConfig | ImageClipConfig;
+export type ClipConfig =
+  | GeneratedClipConfig
+  | ReferenceClipConfig
+  | VideoClipConfig
+  | ImageClipConfig;
 
 export type LocaleConfig = {
   bgm?: string | null;
@@ -78,6 +98,7 @@ export type ProjectConfig = {
 };
 
 export type RenderCut = {
+  audioVolume?: number;
   durationInFrames: number;
   hasAudio?: boolean;
   id: string;
@@ -146,20 +167,31 @@ export type BaseJobPlan = {
   prompt: string;
 };
 
+export type ReferenceJobPlan = {
+  aspectRatio: SupportedAspectRatio;
+  clipId: string;
+  language: string;
+  prompt: string;
+};
+
 export type PlannedVariant = {
   aspectRatio: SupportedAspectRatio;
   generatedClipCount: number;
   language: string;
   ratioSlug: string;
   usesGeneratedClips: boolean;
+  referenceClipCount: number;
+  usesReferenceClips: boolean;
 };
 
 export type PipelinePlan = {
   baseJobs: BaseJobPlan[];
+  referenceJobs: ReferenceJobPlan[];
   sourceFormat: "legacy" | "project";
   totals: {
     baseJobs: number;
     generatedClipVariants: number;
+    referenceJobs: number;
     soundJobs: number;
     speechJobs: number;
     totalJobs: number;

@@ -8,7 +8,7 @@ This repository is an agent-first pipeline for generating character videos. Rath
 
 - Turn a character image into a talking character video placed in a photoreal, live-action-style environment
 - Batch-process projects from `project.yaml` across multiple locales and aspect ratios
-- Mix `generated | video | image` clips in the same timeline
+- Mix `generated | reference | video | image` clips in the same timeline
 - Turn PixVerse outputs into `manifest.render.json` files and final `character.mp4` renders
 - Accept legacy `spokesperson.yaml` as a backward-compatible input format
 
@@ -33,6 +33,11 @@ Generate a vertical SNS character video from this image, English only.
 Urban office-style photoreal background.
 ```
 
+```text
+Reference this character first, then build a 4-cut shrine-at-night story teaser.
+Make each cut a different scene, then add BGM and captions in the final render.
+```
+
 If information is missing, the agent will ask follow-up questions in this order:
 
 1. Project name and date
@@ -53,6 +58,14 @@ The goal is to build a valid `project.yaml`, then execute the pipeline.
 5. `run --dry-run` if the user wants to review first
 6. `run` for full execution (PixVerse generation through final render)
 7. `render` for configs using only local `video` / `image` clips
+
+Default behavior for story / teaser / trailer requests:
+
+1. Break the concept into 3-5 story beats
+2. Generate each beat independently with `pixverse create reference --images`
+3. Add speech per cut with `pixverse create speech`
+4. Write those beats as `source: reference` clips in `project.yaml`
+5. Use `./bin/pipeline run` to do reference generation, BGM / caption staging, and final render
 
 ## Setup
 
@@ -99,12 +112,14 @@ cd remotion
 ./bin/pipeline validate --config ../fixtures/generated/project.yaml
 ./bin/pipeline plan --config ../fixtures/generated/project.yaml
 ./bin/pipeline run --config ../fixtures/generated/project.yaml --dry-run
+./bin/pipeline story --image ../fixtures/shared/assets/speaker.svg --config-out ./story.yaml
 ./bin/pipeline render --config ../fixtures/basic/project.yaml --lang en --ratio 16:9
 ```
 
 - `validate`: normalize and validate config input
 - `plan`: inspect variant counts and job counts
 - `run`: PixVerse generation → render manifests → final MP4s
+- `story`: interactively build a reference-story `project.yaml`, then optionally `dry-run` or `run`
 - `render`: render a single variant using only local clips
 
 `pnpm pipeline:*` is available as a convenience alias. Prefer `./bin/pipeline` when shell PATH resolution is unreliable.
@@ -137,6 +152,14 @@ locales:
         durationSeconds: 5
         overlayText: 春のキャンペーン開始
         overlayStyle: title
+      - id: teaser-beat
+        source: reference
+        prompt: The same character from the reference image stands in a moonlit shrine courtyard, slow push in, vertical portrait framing.
+        text: 物語の扉が開く。
+        ttsSpeaker: 1
+        durationSeconds: 4
+        overlayText: 物語の扉が開く
+        overlayStyle: subtitle
       - id: endcard
         source: image
         asset: ./assets/endcard.png
@@ -158,7 +181,9 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse uses `prompt.base` / `prompt.perRatio` to turn the input character image into a generated scene. The live-action background look is prompt-driven and can be tuned per project or per aspect ratio.
+PixVerse uses `prompt.base` / `prompt.perRatio` to turn the input character image into a generated scene. `source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow.
+
+`generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
 
 ## Output Layout
 
@@ -177,6 +202,7 @@ Remotion staging assets are generated automatically under `remotion/public/.pipe
 
 - `fixtures/basic/project.yaml`: local `video` + `image` render smoke test
 - `fixtures/generated/project.yaml`: mixed generated / video / image plan and dry-run fixture
+- `fixtures/reference-story/project.yaml`: per-cut `reference` story fixture
 - `fixtures/legacy/spokesperson.yaml`: legacy-format compatibility fixture
 
 ```bash

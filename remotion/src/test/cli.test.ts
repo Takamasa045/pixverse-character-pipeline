@@ -67,6 +67,51 @@ test("pipeline run dry-run writes a manifest", async () => {
   assert.equal(manifest.summary.planned, 4);
 });
 
+test("pipeline run dry-run supports reference clips without invoking PixVerse", async () => {
+  const runId = "reference-story-dry-run";
+  const runDir = resolve(outputRoot, "reference-story-fixture", runId);
+  await rm(runDir, { force: true, recursive: true });
+
+  const result = await runCommand(
+    pipelineBin,
+    [
+      "run",
+      "--config",
+      "../fixtures/reference-story/project.yaml",
+      "--dry-run",
+      "--run-id",
+      runId,
+    ],
+    {
+      captureOutput: true,
+      cwd: process.cwd(),
+    },
+  );
+
+  const payload = parseTrailingJson(result.stdout);
+  const manifest = JSON.parse(await readFile(payload.manifestPath, "utf8"));
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.plan.referenceJobs, 2);
+  assert.equal(manifest.summary.planned, 1);
+  assert.equal(manifest.variants[0]?.clipAssets.hook, "en/9x16/assets/hook.mp4");
+});
+
+test("pipeline render rejects reference clips", async () => {
+  await assert.rejects(
+    async () =>
+      await runCommand(
+        pipelineBin,
+        ["render", "--config", "../fixtures/reference-story/project.yaml"],
+        {
+          captureOutput: true,
+          cwd: process.cwd(),
+        },
+      ),
+    /pipeline:render only supports local video\/image clips\. Use pipeline:run for generated or reference clips\./,
+  );
+});
+
 test("pipeline render produces an mp4 for local assets", async () => {
   const runId = "render-smoke";
   const runDir = resolve(outputRoot, "local-smoke", runId);

@@ -3,6 +3,7 @@ import { basename, dirname, extname, relative, resolve } from "node:path";
 import { buildRenderManifest } from "./manifest";
 import {
   createBaseVideo,
+  createReferenceVideo,
   createSound,
   createSpeech,
   createUpscale,
@@ -19,6 +20,7 @@ import type {
   ClipStageIds,
   GeneratedClipConfig,
   PipelinePlan,
+  ReferenceClipConfig,
   RunManifest,
   RunVariantManifest,
   SupportedAspectRatio,
@@ -99,6 +101,9 @@ const isSelectedVariant = (
   return true;
 };
 
+const clipNeedsSpeech = (clip: GeneratedClipConfig | ReferenceClipConfig): boolean =>
+  Boolean(clip.text || clip.audioFile);
+
 const prepareGeneratedClip = async ({
   aspectRatio,
   baseVideoId,
@@ -133,6 +138,83 @@ const prepareGeneratedClip = async ({
   let latestId = speechId;
   let soundId: string | null = null;
   let upscaleId: string | null = null;
+
+  if (config.generation.ambientSound) {
+    soundId = await createSound(latestId, config.generation.ambientSound);
+    await waitForTask(soundId);
+    latestId = soundId;
+  }
+
+  if (config.generation.upscale) {
+    upscaleId = await createUpscale(latestId, config.generation.quality);
+    await waitForTask(upscaleId);
+    latestId = upscaleId;
+  }
+
+  const tempDownloadDir = resolve(outputAssetsDir, ".downloads", ratioToSlug(aspectRatio), clip.id);
+  await rm(tempDownloadDir, { force: true, recursive: true });
+
+  const downloadedPath = await downloadAsset(latestId, tempDownloadDir);
+  const outputPath = resolve(outputAssetsDir, targetName);
+  await mkdir(outputAssetsDir, { recursive: true });
+  await rename(downloadedPath, outputPath);
+
+  const stagePath = resolve(stageAssetsDir, targetName);
+  await mkdir(stageAssetsDir, { recursive: true });
+  await copyFile(outputPath, stagePath);
+  await rm(tempDownloadDir, { force: true, recursive: true });
+
+  return {
+    outputPath,
+    publicPath: relativeToPublic(stagePath),
+    stageIds: {
+      final: latestId,
+      sound: soundId,
+      speech: speechId,
+      upscale: upscaleId,
+    },
+  };
+};
+
+const prepareReferenceClip = async ({
+  aspectRatio,
+  clip,
+  config,
+  dryRun,
+  outputAssetsDir,
+  stageAssetsDir,
+}: {
+  aspectRatio: SupportedAspectRatio;
+  clip: ReferenceClipConfig;
+  config: LoadedConfig["config"];
+  dryRun: boolean;
+  outputAssetsDir: string;
+  stageAssetsDir: string;
+}): Promise<{ outputPath: string; publicPath: string; stageIds: ClipStageIds }> => {
+  const targetName = clipTargetName(clip.id, null, ".mp4");
+
+  if (dryRun) {
+    const reserved = reserveVariantPath(outputAssetsDir, stageAssetsDir, targetName);
+    return {
+      outputPath: reserved.outputPath,
+      publicPath: reserved.publicPath,
+      stageIds: { final: null, sound: null, speech: null, upscale: null },
+    };
+  }
+
+  const baseVideoId = await createReferenceVideo({ aspectRatio, clip, config });
+  await waitForTask(baseVideoId);
+
+  let latestId = baseVideoId;
+  let speechId: string | null = null;
+  let soundId: string | null = null;
+  let upscaleId: string | null = null;
+
+  if (clipNeedsSpeech(clip)) {
+    speechId = await createSpeech(latestId, clip);
+    await waitForTask(speechId);
+    latestId = speechId;
+  }
 
   if (config.generation.ambientSound) {
     soundId = await createSound(latestId, config.generation.ambientSound);
@@ -248,6 +330,22 @@ const executeVariant = async ({
       continue;
     }
 
+    if (clip.source === "reference") {
+      const generated = await prepareReferenceClip({
+        aspectRatio,
+        clip,
+        config: config.config,
+        dryRun,
+        outputAssetsDir,
+        stageAssetsDir,
+      });
+
+      clipAssetPublicPaths[clip.id] = generated.publicPath;
+      clipAssets[clip.id] = toPosix(relative(runRoot, generated.outputPath));
+      clipVideoIds[clip.id] = generated.stageIds;
+      continue;
+    }
+
     const targetName = clipTargetName(
       clip.id,
       clip.asset,
@@ -322,10 +420,10 @@ export const executePipeline = async (
 
   if (
     options.mode === "render" &&
-    selectedVariants.some((variant) => variant.usesGeneratedClips)
+    selectedVariants.some((variant) => variant.usesGeneratedClips || variant.usesReferenceClips)
   ) {
     throw new Error(
-      "pipeline:render only supports local video/image clips. Use pipeline:run for generated clips.",
+      "pipeline:render only supports local video/image clips. Use pipeline:run for generated or reference clips.",
     );
   }
 

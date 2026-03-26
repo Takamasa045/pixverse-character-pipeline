@@ -14,7 +14,7 @@ import { Audio, Video } from "@remotion/media";
 import { DEFAULT_THEME } from "./lib/constants";
 import type { OverlayStyle, RenderManifest } from "./lib/types";
 
-type CharacterVideoProps = {
+export type CharacterVideoProps = {
   manifestPath: string;
 };
 
@@ -89,6 +89,7 @@ const Overlay: React.FC<{ text: string; style: OverlayStyle; accent: string }> =
             fontFamily: '"Avenir Next", "Hiragino Sans", "Noto Sans JP", sans-serif',
             lineHeight: 1.2,
             maxWidth: "80%",
+            whiteSpace: "pre-line",
           }}
         >
           {text}
@@ -115,15 +116,22 @@ const Overlay: React.FC<{ text: string; style: OverlayStyle; accent: string }> =
       >
         <div
           style={{
-            fontSize: 42,
-            fontWeight: 700,
+            fontSize: 40,
+            fontWeight: 800,
             color: "#fff",
             textAlign: "center",
-            textShadow: "0 2px 20px rgba(0,0,0,0.5)",
+            textShadow: "0 2px 20px rgba(0,0,0,0.45)",
             transform: `translateY(${translateY}px)`,
             fontFamily: '"Avenir Next", "Hiragino Sans", "Noto Sans JP", sans-serif',
             lineHeight: 1.3,
             maxWidth: "85%",
+            whiteSpace: "pre-line",
+            padding: "20px 28px",
+            borderRadius: 18,
+            background: "rgba(10, 7, 24, 0.56)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
+            backdropFilter: "blur(10px)",
           }}
         >
           {text}
@@ -163,6 +171,7 @@ const Overlay: React.FC<{ text: string; style: OverlayStyle; accent: string }> =
               fontWeight: 700,
               color: "#fff",
               fontFamily: '"Avenir Next", "Hiragino Sans", "Noto Sans JP", sans-serif',
+              whiteSpace: "pre-line",
             }}
           >
             {text}
@@ -194,6 +203,7 @@ const Overlay: React.FC<{ text: string; style: OverlayStyle; accent: string }> =
             fontFamily: '"Avenir Next", "Hiragino Sans", "Noto Sans JP", sans-serif',
             lineHeight: 1.2,
             maxWidth: "82%",
+            whiteSpace: "pre-line",
           }}
         >
           {text}
@@ -282,7 +292,7 @@ const CutScene: React.FC<{
                   interpolate(
                     currentFrame,
                     [0, 5, Math.max(6, durationInFrames - 10), durationInFrames],
-                    [0, 1, 1, 0],
+                    [0, cut.audioVolume ?? 1, cut.audioVolume ?? 1, 0],
                     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
                   )
               : undefined
