@@ -11,7 +11,10 @@ flowchart TD
     Plan --> Credit{"generated clips exist?"}
     Credit -->|No| Stage[Stage local assets]
     Credit -->|Yes| CreditCheck[PixVerse credit check]
-    CreditCheck --> Base[Create base videos per aspect ratio]
+    CreditCheck --> BaseImage{"generation.image.enabled?"}
+    BaseImage -->|Yes| CreateImage[Create base images per aspect ratio]
+    BaseImage -->|No| Base[Create base videos per aspect ratio]
+    CreateImage --> Base
     Base --> Speech[Create speech jobs per generated clip]
     Speech --> Post{Ambient sound / upscale?}
     Post -->|Ambient sound| Sound[Create sound jobs]
@@ -28,9 +31,11 @@ flowchart TD
 ## Job Count Formula
 
 ```text
-base_jobs   = number of requested aspect ratios if any generated clip exists else 0
-speech_jobs = generated_clips x aspect_ratios
-sound_jobs  = speech_jobs if ambientSound else 0
-upscale_jobs = speech_jobs if upscale else 0
-total_jobs  = base_jobs + speech_jobs + sound_jobs + upscale_jobs
+image_jobs     = aspect_ratios if generated clips exist and generation.image.enabled else 0
+base_jobs      = aspect_ratios if generated clips exist else 0
+reference_jobs = reference_clips x aspect_ratios
+speech_jobs    = narrated_generated_or_reference_clips x aspect_ratios
+sound_jobs     = generated_or_reference_clips x aspect_ratios if ambientSound else 0
+upscale_jobs   = generated_or_reference_clips x aspect_ratios if upscale else 0
+total_jobs     = image_jobs + base_jobs + reference_jobs + speech_jobs + sound_jobs + upscale_jobs
 ```

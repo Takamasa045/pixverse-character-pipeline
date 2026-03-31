@@ -2,14 +2,14 @@
 name: character-video-pipeline
 description: >
   Generate character videos from a single character image. Three modes:
-  (A) Creative workflow — 3-view turnaround, cut image compositing, I2V, lip sync, Remotion edit.
+  (A) Creative workflow — 3-view turnaround, cut image generation, I2I, I2V, lip sync, Remotion edit.
   (B) Config-driven pipeline — project.yaml → validate → plan → run → render.
   (C) Reference story workflow — per-cut `pixverse create reference --images` → speech → pipeline timeline.
   Use when the user says "character video", "talking character", "lip sync video",
   "キャラクター動画", "多言語アナウンス動画", "multilingual video",
   "このキャラで動画作って", "キャラを実写背景に馴染ませて".
 metadata:
-  version: "3.2"
+  version: "3.3"
 ---
 
 # Character Video Pipeline
@@ -30,7 +30,7 @@ metadata:
 | 駆動 | エージェントがフェーズごとに実行 | `./bin/pipeline` CLI が自動実行 | エージェントが各カットを個別生成し、最後だけ pipeline で編集 |
 | 向き | 単言語、カット構成にこだわりたい | 多言語バッチ、再現性重視 | ティザー、トレーラー、物語型のマルチカット |
 | 入力 | キャラ画像 + 対話 | `project.yaml` | キャラ画像 + 対話 |
-| 画像/動画生成 | Nano Banana MCP + PixVerse I2V | PixVerse（プロンプト駆動） | PixVerse `create reference --images` を各カットごとに使う |
+| 画像/動画生成 | PixVerse I2I + PixVerse I2V | PixVerse（プロンプト駆動） | PixVerse `create reference --images` を各カットごとに使う |
 | 出力 | `manifest.json`（手動） → Remotion | `manifest.render.json`（自動） → Remotion | ローカル `video` クリップを並べた `project.yaml` → Remotion |
 
 ---
@@ -38,8 +38,8 @@ metadata:
 ## Critical Rules
 
 1. **3面図は必ず最初に作る** — キャラ一貫性の土台。複数カットに進む前に必須（Mode A）
-2. **画像生成は Nano Banana を使う** — `maintainCharacterConsistency: true` + `blendImages: true`。3面図を `inputImagePath` に渡す（Mode A）
-3. **動画生成は I2V のみ** — 合成画像を入力にする。T2V は使わない（キャラが崩れる）
+2. **画像生成は PixVerse `create image` を使う** — 3面図もカット画像も `--image` / `--images` の I2I で作る。`generation.image.model` には PixVerse CLI の image model を指定する
+3. **動画生成は I2V を優先** — 単一画像フローでは合成画像を `create video --image` に渡す。T2V はキャラ一貫性が崩れやすい
 4. **ナレーションは PixVerse `create speech`** — 動画に直接焼き込む。Remotion は `hasAudio: true` で音声をそのまま使う
 5. **Every PixVerse call must include `--json`**
 6. **カメラワークの重複禁止** — 全カット同じカメラワークにしない（→ `references/prompt-library.md`）
@@ -55,9 +55,9 @@ metadata:
 ```
 キャラ画像 (1枚)
     ▼
-Phase 1: 3面図生成 (Nano Banana)
+Phase 1: 3面図生成 (PixVerse CLI)
     ▼
-Phase 2: カット画像生成 (Nano Banana) — 実写背景に合成
+Phase 2: カット画像生成 (PixVerse CLI) — 実写背景に合成
     ▼
 Phase 3: I2V 動画化 (PixVerse CLI)
     ▼
@@ -70,45 +70,41 @@ Phase 5: Remotion 編集・レンダリング
 
 ### Phase 1: 3面図生成
 
-Nano Banana MCP で正面・3/4・背面の3アングルを生成:
+PixVerse `create image` で正面・3/4・背面の3アングルを含む 3面図を生成:
 
+```bash
+pixverse create image \
+  --image [元キャラ画像パス] \
+  --prompt "Character turnaround sheet of [キャラ説明]. Three views side by side: front view, 3/4 view, and back view. Clean white background, full body, consistent proportions, character design reference sheet style." \
+  --model gemini-3.1-flash \
+  --quality 720p \
+  --aspect-ratio 16:9 \
+  --no-wait --json
 ```
-mcp__nano-banana-2__generate_image:
-  prompt: "Character turnaround sheet of [キャラ説明].
-           Three views side by side: front view, 3/4 view, and back view.
-           Clean white background, full body, consistent proportions,
-           character design reference sheet style"
-  inputImagePath: [元キャラ画像の絶対パス]
-  aspectRatio: "16:9"
-  quality: "quality"
-  maintainCharacterConsistency: true
-  purpose: "character design reference sheet for video production"
-  imageSize: "2K"
-```
+
+補足:
+- 複数の参照画像がある場合は `--image` の代わりに `--images` を使う
+- `gemini-3.1-flash` は既定値。`qwen-image` や `seedream-5.0-lite` など、他の PixVerse image model でもよい
 
 ### Phase 2: カット画像生成
 
 3面図を参照して、カットごとの合成画像を生成:
 
-```
-mcp__nano-banana-2__generate_image:
-  prompt: "[キャラ説明] in [シーン説明].
-           Photorealistic [背景説明].
-           Character naturally composited into real photograph.
-           [ショットサイズ], [ライティング]"
-  inputImagePath: [3面図画像の絶対パス]
-  aspectRatio: "16:9" or "9:16"
-  quality: "quality"
-  maintainCharacterConsistency: true
-  blendImages: true
-  purpose: "Video production reference image for I2V generation"
-  imageSize: "2K"
+```bash
+pixverse create image \
+  --image [3面図または参照画像パス] \
+  --prompt "[キャラ説明] in [シーン説明]. Photorealistic [背景説明]. Character naturally composited into real photograph. [ショットサイズ], [ライティング]." \
+  --model gemini-3.1-flash \
+  --quality 720p \
+  --aspect-ratio 16:9 \
+  --no-wait --json
 ```
 
 プロンプトのコツ:
 - `"character naturally composited into real photograph"` を必ず入れる
 - 背景は `"photorealistic"` `"real"` を明示する
 - キャラ説明は性別・髪型・服装を毎回書く（一貫性のため）
+- 複数の参照を混ぜたい場合は `--images` を使う
 
 ### Phase 3: I2V 動画化
 
@@ -248,7 +244,7 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-既定では `generation.image.enabled: true` で、PixVerse `create image` を `gemini-3.1-flash` で実行してベース静止画を作ってから I2V に渡す。`generation.image.prompt` が未指定なら `generation.prompt` を使う。動画生成の既定は `v6` / `720p`。
+既定では `generation.image.enabled: true` で、PixVerse `create image` を使ってベース静止画を作ってから I2V に渡す。`generation.image.model` は PixVerse CLI の image model 名で、既定値は `gemini-3.1-flash`。`qwen-image` や `seedream-5.0-lite` なども指定できる。`generation.image.prompt` が未指定なら `generation.prompt` を使う。動画生成の既定は `v6` / `720p`。
 
 `project.yaml` がない場合 → `references/interactive-questions.md` のフローでヒアリング。
 
@@ -446,8 +442,9 @@ Remotion staging assets → `remotion/public/.pipeline/`
 
 | ツール | 用途 |
 |--------|------|
-| Nano Banana MCP (`mcp__nano-banana-2__generate_image`) | 3面図 + カット画像生成 (Mode A) |
+| PixVerse CLI (`pixverse create image`) | 3面図 + カット画像生成 (Mode A / B) |
 | PixVerse CLI (`pixverse create video`) | I2V 動画生成 |
+| PixVerse CLI (`pixverse create reference`) | 複数画像からの reference 動画生成 |
 | PixVerse CLI (`pixverse create speech`) | リップシンク TTS |
 | Remotion | 編集・レンダリング |
 | `short-video-editing` スキル | 構成設計・レビュー |

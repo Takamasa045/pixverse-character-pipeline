@@ -3,6 +3,7 @@
 [日本語](./README.ja.md)
 
 This repository is an agent-first pipeline for generating character videos. Rather than running CLI commands directly, you describe what you want in natural language, and the AI agent normalizes your request into `project.yaml`, then drives PixVerse and Remotion to produce the final MP4.
+All image and video generation paths documented in this repo are implemented through PixVerse CLI; Remotion is used for staging and the final render only.
 
 ## Agent Compatibility
 
@@ -194,7 +195,7 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is I2V-first: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*` using `gemini-3.1-flash`, downloads it locally, then runs I2V from that still. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
+PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name and defaults to `gemini-3.1-flash`; other supported PixVerse image models such as `qwen-image` or `seedream-5.0-lite` can also be used. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
 
 `source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
 

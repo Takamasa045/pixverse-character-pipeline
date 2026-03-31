@@ -75,10 +75,11 @@ For story-mode, also extract:
 ## Group 6: Generation Settings
 
 > Generation settings:
-> - Model: `v5.6`
-> - Quality: `1080p`
+> - Model: `v6`
+> - Quality: `720p`
 > - Upscale: `yes`
 > - Ambient sound: `none`
+> - Base image model: `gemini-3.1-flash` (ask only if an override is needed)
 >
 > Reply with changes or say `ok`.
 
@@ -87,6 +88,7 @@ For story-mode, also extract:
 - `generation.quality`
 - `generation.upscale`
 - `generation.ambientSound`
+- `generation.image.model` when the user wants a non-default PixVerse image model
 - `generation.prompt.base`
 - `generation.prompt.perRatio`
 

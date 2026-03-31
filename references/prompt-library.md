@@ -2,12 +2,32 @@
 
 ## Prompt Construction Guide
 
-### Phase 2: カット画像プロンプト (Nano Banana)
+### Phase 1: 3面図プロンプト (PixVerse `create image`)
+
+用途:
+- `pixverse create image --image <path>` または `--images <paths...>` で 3面図を作る
+- `generation.image.model` は PixVerse CLI の image model を使う。既定値は `gemini-3.1-flash`
+
+必須要素:
+- `"character turnaround sheet"` または同等の参照シート表現
+- `front view`, `3/4 view`, `back view`
+- `clean white background`
+- `consistent proportions`, `character design reference sheet style`
+
+テンプレート:
+```
+Character turnaround sheet of [キャラ説明].
+Three views side by side: front view, 3/4 view, and back view.
+Clean white background, full body, consistent proportions, character design reference sheet style.
+```
+
+### Phase 2: カット画像プロンプト (PixVerse `create image`)
 
 必須要素:
 - `"character naturally composited into real photograph"` — 必ず含める
 - 背景には `"photorealistic"` `"real"` を明示
 - キャラ説明は性別・髪型・服装を毎回書く（一貫性のため）
+- 3面図または参照画像を `--image` / `--images` で渡して I2I にする
 
 テンプレート:
 ```
