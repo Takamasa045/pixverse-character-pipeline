@@ -32,3 +32,16 @@ test("planner counts per-cut reference jobs separately from shared base jobs", a
   assert.equal(plan.variants[0]?.referenceClipCount, 2);
   assert.equal(plan.variants[0]?.usesReferenceClips, true);
 });
+
+test("planner does not count speech jobs for silent generated clips", async () => {
+  const loaded = await loadProjectConfig(
+    resolve(process.cwd(), "../fixtures/generated/silent-project.yaml"),
+  );
+  const plan = buildPipelinePlan(loaded);
+
+  assert.equal(plan.totals.variants, 1);
+  assert.equal(plan.totals.baseJobs, 1);
+  assert.equal(plan.totals.imageJobs, 1);
+  assert.equal(plan.totals.speechJobs, 0);
+  assert.equal(plan.totals.totalJobs, 2);
+});

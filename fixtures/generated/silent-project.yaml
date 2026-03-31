@@ -1,0 +1,40 @@
+project:
+  slug: silent-generated
+  title: Silent Generated Clip
+  date: "2026-03-31"
+
+speaker:
+  name: Silent Guide
+  images:
+    - ../shared/assets/speaker.svg
+  mode: single
+
+locales:
+  en:
+    theme:
+      background: "#0f172a"
+      accent: "#38bdf8"
+      text: "#ffffff"
+    clips:
+      - id: silent-opener
+        source: generated
+        durationSeconds: 2
+        overlayText: Silent Intro
+        overlayStyle: title
+
+render:
+  aspectRatios: ["16:9"]
+  fps: 30
+  outputDir: ../../output
+
+generation:
+  model: v6
+  quality: 720p
+  upscale: false
+  ambientSound: null
+  image:
+    enabled: true
+    model: gemini-3.1-flash
+    quality: 720p
+  prompt:
+    base: A silent talking character derived from the provided character image, facing camera in a photoreal live-action environment with subtle natural movement and no spoken narration

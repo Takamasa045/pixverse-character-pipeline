@@ -5,6 +5,15 @@
 このリポジトリは、CLI を人が直接叩くための説明書というより、AI エージェントに自然言語で依頼して使うためのパイプラインです。  
 ユーザーは「何を作りたいか」を自然文で伝え、エージェントはそれを `project.yaml` に正規化し、PixVerse と Remotion で最終動画まで実行します。
 
+## Agent Compatibility
+
+このリポは Claude Code と Codex の両方で使える前提で整理しています。
+
+- 実行本体は tool-agnostic で、`project.yaml` と `remotion/./bin/pipeline` が中心
+- `.claude/*` はローカル補助設定であり、パイプライン実行の必須条件ではない
+- `CLAUDE.md` と `AGENTS.md` に、それぞれの入口向けの同等ガイドを置く
+- coordinator / story / planning / QA の sub-agent 分担案も repo 内に含める
+
 ## まずどう頼むか
 
 AI エージェントへの入口は、コマンドではなく依頼文です。

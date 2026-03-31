@@ -77,6 +77,35 @@ test("pipeline run dry-run writes a manifest", async () => {
   assert.equal(manifest.variants[0].baseImageAsset, null);
 });
 
+test("pipeline run dry-run allows generated clips without narration", async () => {
+  const runId = "silent-generated-dry-run";
+  const runDir = resolve(outputRoot, "silent-generated", runId);
+  await rm(runDir, { force: true, recursive: true });
+
+  const result = await runCommand(
+    pipelineBin,
+    [
+      "run",
+      "--config",
+      "../fixtures/generated/silent-project.yaml",
+      "--dry-run",
+      "--run-id",
+      runId,
+    ],
+    {
+      captureOutput: true,
+      cwd: process.cwd(),
+    },
+  );
+
+  const payload = parseTrailingJson(result.stdout);
+  const manifest = JSON.parse(await readFile(payload.manifestPath, "utf8"));
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.plan.speechJobs, 0);
+  assert.equal(manifest.summary.planned, 1);
+});
+
 test("pipeline run dry-run supports reference clips without invoking PixVerse", async () => {
   const runId = "reference-story-dry-run";
   const runDir = resolve(outputRoot, "reference-story-fixture", runId);

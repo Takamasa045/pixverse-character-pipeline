@@ -148,12 +148,16 @@ const prepareGeneratedClip = async ({
     };
   }
 
-  const speechId = await createSpeech(baseVideoId, clip);
-  await waitForTask(speechId);
-
-  let latestId = speechId;
+  let latestId = baseVideoId;
+  let speechId: string | null = null;
   let soundId: string | null = null;
   let upscaleId: string | null = null;
+
+  if (clipNeedsSpeech(clip)) {
+    speechId = await createSpeech(baseVideoId, clip);
+    await waitForTask(speechId);
+    latestId = speechId;
+  }
 
   if (config.generation.ambientSound) {
     soundId = await createSound(latestId, config.generation.ambientSound);

@@ -4,6 +4,15 @@
 
 This repository is an agent-first pipeline for generating character videos. Rather than running CLI commands directly, you describe what you want in natural language, and the AI agent normalizes your request into `project.yaml`, then drives PixVerse and Remotion to produce the final MP4.
 
+## Agent Compatibility
+
+This repo is meant to work with both Claude Code and Codex.
+
+- The runtime is tool-agnostic: `project.yaml` + `remotion/./bin/pipeline`
+- `.claude/*` files are optional local helpers, not required to run the pipeline
+- `CLAUDE.md` and `AGENTS.md` document the same workflow from each tool's entrypoint
+- A recommended multi-agent split is included for coordinator / story / planning / QA roles
+
 ## What It Does
 
 - Turn a character image into a talking character video placed in a photoreal, live-action-style environment

@@ -454,12 +454,6 @@ export const validateProjectConfig = (config: ProjectConfig): void => {
           throw new Error(`Reference clip ${language}/${clip.id} requires prompt.`);
         }
 
-        if (!clip.text && !clip.audioFile) {
-          if (clip.source === "generated") {
-            throw new Error(`Generated clip ${language}/${clip.id} requires text or audioFile.`);
-          }
-        }
-
         if (clip.audioFile && !existsSync(clip.audioFile)) {
           throw new Error(`Missing audioFile for ${language}/${clip.id}: ${clip.audioFile}`);
         }
