@@ -204,17 +204,21 @@ render:
   outputDir: ./output
 
 generation:
-  model: v5.6
+  model: v6
   quality: 1080p
   upscale: true
   ambientSound: null
+  image:
+    enabled: true
+    model: gemini-3.1-flash
+    quality: 1080p
   prompt:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を使って、キャラ画像から実写背景込みのシーンを生成します。`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。
+PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を共有ベース動画向けの動画用プロンプトとして使います。`generation.image.enabled: true` の場合は、まず `generation.image.*` でベース静止画を作ってローカルに保存し、その静止画から I2V を実行します。`generation.image.prompt` を省略した場合は `generation.prompt` がフォールバックとして使われます。
 
-`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
+`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
 
 ## 出力
 

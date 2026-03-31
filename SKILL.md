@@ -117,7 +117,7 @@ pixverse create video \
   --image [合成画像パス] \
   --prompt "[シーンの動き・変化を2-4文で記述]" \
   --aspect-ratio 16:9 \
-  --model v5.6 \
+  --model v6 \
   --duration [4-8] \
   --quality 1080p \
   --no-wait --json
@@ -236,19 +236,25 @@ render:
   outputDir: ./output
 
 generation:
-  model: v5.6
+  model: v6
   quality: 1080p
   upscale: true
   ambientSound: null
+  image:
+    enabled: true
+    model: gemini-3.1-flash
+    quality: 1080p
   prompt:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
+
+`generation.image.enabled: true` を指定すると、PixVerse `create image` でベース静止画を作ってから I2V に渡す。`generation.image.prompt` が未指定なら `generation.prompt` を使う。
 
 `project.yaml` がない場合 → `references/interactive-questions.md` のフローでヒアリング。
 
 ### Clip Semantics
 
-- `source: generated` — requires `text` or `audioFile`, uses PixVerse `create speech`
+- `source: generated` — requires `text` or `audioFile`; pipeline runs direct I2V or `create image` → I2V before PixVerse `create speech`
 - `source: video` — requires `asset`, uses local file in Remotion
 - `source: image` — requires `asset`, renders as still/endcard
 
@@ -360,13 +366,15 @@ cd remotion
 1. Load and normalize config
 2. Validate schema and file paths
 3. Plan variants and job counts
-4. Generate base videos per aspect ratio (generated clips exist の場合)
-5. Generate speech per generated or reference clip
-6. Optionally run sound and upscale
-7. Download generated assets
-8. Build `manifest.render.json` per variant
-9. Render final `character.mp4` with Remotion
-10. Write top-level `manifest.json`
+4. Optionally generate base images per aspect ratio (`generation.image.enabled=true` の場合)
+5. Generate base videos per aspect ratio (generated clips exist の場合)
+6. Generate per-cut reference videos (`source: reference` がある場合)
+7. Generate speech per generated or reference clip
+8. Optionally run sound and upscale
+9. Download generated assets
+10. Build `manifest.render.json` per variant
+11. Render final `character.mp4` with Remotion
+12. Write top-level `manifest.json`
 
 ### Legacy Compatibility
 
@@ -383,6 +391,7 @@ cd remotion
 | Command | Purpose |
 |---------|---------|
 | `pixverse account info --json` | Credit check |
+| `pixverse create image` | Base still image generation |
 | `pixverse create video --image` | Base video from one image |
 | `pixverse create reference --images` | Base video from multiple images |
 | `pixverse create speech --tts-text` | TTS lip sync |
@@ -390,7 +399,7 @@ cd remotion
 | `pixverse create sound --prompt` | Optional ambient sound |
 | `pixverse create upscale --quality` | Optional final upscale |
 | `pixverse task wait <id> --json` | Wait for async jobs |
-| `pixverse asset download <id> --dest <dir> --json` | Download generated video |
+| `pixverse asset download <id> --dest <dir> --json` | Download generated image/video |
 
 ## Validation Checklist
 

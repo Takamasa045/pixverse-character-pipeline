@@ -2,6 +2,17 @@ import { ratioToSlug } from "./helpers";
 import type { LoadedConfig } from "./config";
 import type { PipelinePlan } from "./types";
 
+const resolvePrompt = (
+  loaded: LoadedConfig,
+  type: "image" | "video",
+  aspectRatio: PipelinePlan["variants"][number]["aspectRatio"],
+): string =>
+  type === "image"
+    ? loaded.config.generation.image.prompt.perRatio?.[aspectRatio] ??
+      loaded.config.generation.image.prompt.base
+    : loaded.config.generation.prompt.perRatio?.[aspectRatio] ??
+      loaded.config.generation.prompt.base;
+
 export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
   const generatedClipVariants = Object.values(loaded.config.locales).reduce(
     (sum, locale) =>
@@ -27,13 +38,18 @@ export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
     }),
   );
 
-  const requiresSharedBaseGeneration = variants.some((variant) => variant.usesGeneratedClips);
-  const baseJobs = requiresSharedBaseGeneration
+  const requiresGeneration = variants.some((variant) => variant.usesGeneratedClips);
+  const imageJobs =
+    requiresGeneration && loaded.config.generation.image.enabled
+      ? loaded.config.render.aspectRatios.map((aspectRatio) => ({
+          aspectRatio,
+          prompt: resolvePrompt(loaded, "image", aspectRatio),
+      }))
+    : [];
+  const baseJobs = requiresGeneration
     ? loaded.config.render.aspectRatios.map((aspectRatio) => ({
         aspectRatio,
-        prompt:
-          loaded.config.generation.prompt.perRatio?.[aspectRatio] ??
-          loaded.config.generation.prompt.base,
+        prompt: resolvePrompt(loaded, "video", aspectRatio),
       }))
     : [];
 
@@ -74,15 +90,23 @@ export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
 
   return {
     baseJobs,
+    imageJobs,
     referenceJobs,
     sourceFormat: loaded.sourceFormat,
     totals: {
       baseJobs: baseJobs.length,
       generatedClipVariants,
+      imageJobs: imageJobs.length,
       referenceJobs: referenceJobs.length,
       soundJobs,
       speechJobs,
-      totalJobs: baseJobs.length + referenceJobs.length + speechJobs + soundJobs + upscaleJobs,
+      totalJobs:
+        imageJobs.length +
+        baseJobs.length +
+        referenceJobs.length +
+        speechJobs +
+        soundJobs +
+        upscaleJobs,
       upscaleJobs,
       variants: variants.length,
     },

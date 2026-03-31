@@ -18,7 +18,7 @@ const parseTrailingJson = (output: string) => {
 test("pipeline validate and plan succeed for fixture config", async () => {
   const validate = await runCommand(
     pipelineBin,
-    ["validate", "--config", "../fixtures/basic/project.yaml"],
+    ["validate", "--config", "../fixtures/generated/project.yaml"],
     {
       captureOutput: true,
       cwd: process.cwd(),
@@ -34,8 +34,15 @@ test("pipeline validate and plan succeed for fixture config", async () => {
     },
   );
 
-  assert.equal(parseTrailingJson(validate.stdout).ok, true);
-  assert.equal(parseTrailingJson(plan.stdout).ok, true);
+  const validatePayload = parseTrailingJson(validate.stdout);
+  const planPayload = parseTrailingJson(plan.stdout);
+
+  assert.equal(validatePayload.ok, true);
+  assert.equal(validatePayload.generation.model, "v6");
+  assert.equal(validatePayload.generation.image.enabled, true);
+  assert.equal(validatePayload.generation.image.model, "gemini-3.1-flash");
+  assert.equal(planPayload.ok, true);
+  assert.equal(planPayload.plan.totals.imageJobs, 2);
 });
 
 test("pipeline run dry-run writes a manifest", async () => {
@@ -64,7 +71,10 @@ test("pipeline run dry-run writes a manifest", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
   assert.equal(payload.ok, true);
+  assert.equal(payload.plan.imageJobs, 2);
   assert.equal(manifest.summary.planned, 4);
+  assert.equal(manifest.variants[0].baseImageId, null);
+  assert.equal(manifest.variants[0].baseImageAsset, null);
 });
 
 test("pipeline run dry-run supports reference clips without invoking PixVerse", async () => {

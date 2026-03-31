@@ -3,7 +3,7 @@ import { basename, dirname, extname, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import YAML from "yaml";
 import { describeConfigForCli, loadProjectConfig } from "./config";
-import { DEFAULT_THEME, SUPPORTED_ASPECT_RATIOS } from "./constants";
+import { DEFAULT_GENERATION, DEFAULT_THEME, SUPPORTED_ASPECT_RATIOS } from "./constants";
 import { buildPipelinePlan } from "./planner";
 import { executePipeline } from "./pipeline";
 import { slugify, todayIsoDate } from "./helpers";
@@ -149,6 +149,10 @@ export const buildStoryProjectConfig = (answers: StoryAnswers): ProjectConfig =>
   return {
     generation: {
       ambientSound: null,
+      image: {
+        ...DEFAULT_GENERATION.image,
+        enabled: false,
+      },
       model: "v5.6",
       prompt: {
         base: `A reference-driven story teaser set in ${answers.setting}. ${answers.visualMood}`,
@@ -186,6 +190,7 @@ const stringifyProjectConfig = (config: ProjectConfig): string =>
   YAML.stringify({
     generation: {
       ambientSound: config.generation.ambientSound,
+      image: config.generation.image,
       model: config.generation.model,
       prompt: config.generation.prompt,
       quality: config.generation.quality,

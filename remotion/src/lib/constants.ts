@@ -11,7 +11,15 @@ export const DEFAULT_FPS = 30;
 export const DEFAULT_OUTPUT_DIR = "./output";
 export const DEFAULT_GENERATION = {
   ambientSound: null,
-  model: "v5.6",
+  image: {
+    enabled: false,
+    model: "gemini-3.1-flash",
+    prompt: {
+      base: "A photoreal live-action scene featuring the provided character naturally composited into the environment, camera-ready for subsequent image-to-video animation, with realistic depth, clean composition, and polished cinematic lighting",
+    },
+    quality: "1080p",
+  },
+  model: "v6",
   prompt: {
     base: "A talking character derived from the provided character image, speaking directly to camera with subtle head movements and natural blinking, placed in a photoreal live-action environment with realistic depth, clean composition, and polished cinematic lighting",
   },

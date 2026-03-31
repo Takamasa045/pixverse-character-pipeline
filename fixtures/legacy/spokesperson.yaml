@@ -16,7 +16,7 @@ scripts:
 
 output:
   aspect_ratios: ["16:9", "9:16"]
-  model: v5.6
+  model: v6
   quality: 1080p
   duration: 5
   upscale: true

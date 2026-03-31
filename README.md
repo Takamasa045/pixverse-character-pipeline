@@ -173,17 +173,21 @@ render:
   outputDir: ./output
 
 generation:
-  model: v5.6
+  model: v6
   quality: 1080p
   upscale: true
   ambientSound: null
+  image:
+    enabled: true
+    model: gemini-3.1-flash
+    quality: 1080p
   prompt:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse uses `prompt.base` / `prompt.perRatio` to turn the input character image into a generated scene. `source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow.
+PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. If `generation.image.enabled: true`, the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`.
 
-`generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
+`source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
 
 ## Output Layout
 

@@ -60,9 +60,13 @@ render:
   outputDir: ../../output
 
 generation:
-  model: v5.6
+  model: v6
   quality: 1080p
   upscale: true
   ambientSound: null
+  image:
+    enabled: true
+    model: gemini-3.1-flash
+    quality: 1080p
   prompt:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting

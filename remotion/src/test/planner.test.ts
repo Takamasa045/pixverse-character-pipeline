@@ -9,11 +9,13 @@ test("planner counts base, speech and upscale jobs for mixed generated config", 
   const plan = buildPipelinePlan(loaded);
 
   assert.equal(plan.totals.variants, 4);
+  assert.equal(plan.imageJobs.length, 2);
   assert.equal(plan.totals.baseJobs, 2);
+  assert.equal(plan.totals.imageJobs, 2);
   assert.equal(plan.totals.speechJobs, 4);
   assert.equal(plan.totals.soundJobs, 0);
   assert.equal(plan.totals.upscaleJobs, 4);
-  assert.equal(plan.totals.totalJobs, 10);
+  assert.equal(plan.totals.totalJobs, 12);
 });
 
 test("planner counts per-cut reference jobs separately from shared base jobs", async () => {

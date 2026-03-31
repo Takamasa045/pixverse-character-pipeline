@@ -15,6 +15,7 @@ import type {
   ClipConfig,
   LocaleConfig,
   OverlayStyle,
+  PromptConfig,
   ProjectConfig,
   SupportedAspectRatio,
   Theme,
@@ -77,6 +78,30 @@ const normalizeTheme = (value: unknown): Theme => {
     accent: asString(value.accent) ?? DEFAULT_THEME.accent,
     background: asString(value.background) ?? DEFAULT_THEME.background,
     text: asString(value.text) ?? DEFAULT_THEME.text,
+  };
+};
+
+const normalizePromptConfig = (value: unknown, defaults: PromptConfig): PromptConfig => {
+  const raw = isRecord(value) ? value : {};
+  const defaultPerRatio = defaults.perRatio ?? {};
+  const providedPerRatio = isRecord(raw.perRatio)
+    ? Object.fromEntries(
+        Object.entries(raw.perRatio)
+          .filter(([ratio, prompt]) =>
+            SUPPORTED_ASPECT_RATIOS.includes(ratio as SupportedAspectRatio) &&
+            Boolean(asString(prompt)),
+          )
+          .map(([ratio, prompt]) => [ratio, asString(prompt)!]),
+      )
+    : {};
+  const perRatio = {
+    ...defaultPerRatio,
+    ...providedPerRatio,
+  };
+
+  return {
+    base: asString(raw.base) ?? defaults.base,
+    ...(Object.keys(perRatio).length > 0 ? { perRatio } : {}),
   };
 };
 
@@ -196,6 +221,7 @@ const normalizeProjectConfig = (raw: Record<string, unknown>, configDir: string)
   const speakerRaw = isRecord(raw.speaker) ? raw.speaker : {};
   const renderRaw = isRecord(raw.render) ? raw.render : {};
   const generationRaw = isRecord(raw.generation) ? raw.generation : {};
+  const imageGenerationRaw = isRecord(generationRaw.image) ? generationRaw.image : {};
   const promptRaw = isRecord(generationRaw.prompt) ? generationRaw.prompt : {};
   const localesRaw = isRecord(raw.locales) ? raw.locales : {};
 
@@ -224,24 +250,25 @@ const normalizeProjectConfig = (raw: Record<string, unknown>, configDir: string)
       normalizeLocale(localeValue, configDir, defaults),
     ]),
   );
+  const videoPrompt = normalizePromptConfig(promptRaw, DEFAULT_GENERATION.prompt);
+  const imageEnabled =
+    asBoolean(imageGenerationRaw.enabled) ?? DEFAULT_GENERATION.image.enabled;
+  const imagePrompt = normalizePromptConfig(
+    imageGenerationRaw.prompt,
+    imageEnabled ? videoPrompt : DEFAULT_GENERATION.image.prompt,
+  );
 
   return {
     generation: {
       ambientSound: asString(generationRaw.ambientSound) ?? DEFAULT_GENERATION.ambientSound,
-      model: asString(generationRaw.model) ?? DEFAULT_GENERATION.model,
-      prompt: {
-        base: asString(promptRaw.base) ?? DEFAULT_GENERATION.prompt.base,
-        perRatio: isRecord(promptRaw.perRatio)
-          ? Object.fromEntries(
-              Object.entries(promptRaw.perRatio)
-                .filter(([ratio, prompt]) =>
-                  SUPPORTED_ASPECT_RATIOS.includes(ratio as SupportedAspectRatio) &&
-                  Boolean(asString(prompt)),
-                )
-                .map(([ratio, prompt]) => [ratio, asString(prompt)!]),
-            )
-          : undefined,
+      image: {
+        enabled: imageEnabled,
+        model: asString(imageGenerationRaw.model) ?? DEFAULT_GENERATION.image.model,
+        prompt: imagePrompt,
+        quality: asString(imageGenerationRaw.quality) ?? DEFAULT_GENERATION.image.quality,
       },
+      model: asString(generationRaw.model) ?? DEFAULT_GENERATION.model,
+      prompt: videoPrompt,
       quality: asString(generationRaw.quality) ?? DEFAULT_GENERATION.quality,
       upscale: asBoolean(generationRaw.upscale) ?? DEFAULT_GENERATION.upscale,
     },
@@ -319,24 +346,25 @@ const normalizeLegacyConfig = (raw: Record<string, unknown>, configDir: string):
   const aspectRatios = asStringArray(outputRaw.aspect_ratios).filter((ratio): ratio is SupportedAspectRatio =>
     SUPPORTED_ASPECT_RATIOS.includes(ratio as SupportedAspectRatio),
   );
+  const videoPrompt = normalizePromptConfig(promptRaw, DEFAULT_GENERATION.prompt);
 
   return {
     generation: {
       ambientSound: asString(outputRaw.ambient_sound) ?? DEFAULT_GENERATION.ambientSound,
-      model: asString(outputRaw.model) ?? DEFAULT_GENERATION.model,
-      prompt: {
-        base: asString(promptRaw.base) ?? DEFAULT_GENERATION.prompt.base,
-        perRatio: isRecord(promptRaw.per_ratio)
-          ? Object.fromEntries(
-              Object.entries(promptRaw.per_ratio)
-                .filter(([ratio, prompt]) =>
-                  SUPPORTED_ASPECT_RATIOS.includes(ratio as SupportedAspectRatio) &&
-                  Boolean(asString(prompt)),
-                )
-                .map(([ratio, prompt]) => [ratio, asString(prompt)!]),
-            )
-          : undefined,
+      image: {
+        enabled: DEFAULT_GENERATION.image.enabled,
+        model: DEFAULT_GENERATION.image.model,
+        prompt: DEFAULT_GENERATION.image.prompt,
+        quality: DEFAULT_GENERATION.image.quality,
       },
+      model: asString(outputRaw.model) ?? DEFAULT_GENERATION.model,
+      prompt: normalizePromptConfig(
+        {
+          base: videoPrompt.base,
+          perRatio: isRecord(promptRaw.per_ratio) ? promptRaw.per_ratio : videoPrompt.perRatio,
+        },
+        videoPrompt,
+      ),
       quality: asString(outputRaw.quality) ?? DEFAULT_GENERATION.quality,
       upscale: asBoolean(outputRaw.upscale) ?? DEFAULT_GENERATION.upscale,
     },
@@ -469,6 +497,16 @@ export const loadProjectConfig = async (configPath: string): Promise<LoadedConfi
 
 export const describeConfigForCli = (loaded: LoadedConfig) => ({
   aspectRatios: loaded.config.render.aspectRatios,
+  generation: {
+    image: {
+      enabled: loaded.config.generation.image.enabled,
+      model: loaded.config.generation.image.model,
+      quality: loaded.config.generation.image.quality,
+    },
+    model: loaded.config.generation.model,
+    quality: loaded.config.generation.quality,
+    upscale: loaded.config.generation.upscale,
+  },
   locales: Object.keys(loaded.config.locales),
   outputDir: loaded.config.render.outputDir,
   project: loaded.config.project,

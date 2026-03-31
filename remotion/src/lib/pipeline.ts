@@ -2,6 +2,7 @@ import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, relative, resolve } from "node:path";
 import { buildRenderManifest } from "./manifest";
 import {
+  createBaseImage,
   createBaseVideo,
   createReferenceVideo,
   createSound,
@@ -25,6 +26,9 @@ import type {
   RunVariantManifest,
   SupportedAspectRatio,
 } from "./types";
+
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
+const VIDEO_EXTENSIONS = [".mp4"];
 
 type ExecutePipelineOptions = {
   dryRun?: boolean;
@@ -76,6 +80,18 @@ const reserveVariantPath = (
 
 const clipTargetName = (clipId: string, sourcePath: string | null, fallbackExt = ".mp4"): string =>
   `${clipId}${sourcePath ? extname(sourcePath) || fallbackExt : fallbackExt}`;
+
+const baseImageTargetPath = (
+  runRoot: string,
+  aspectRatio: SupportedAspectRatio,
+  downloadedPath: string,
+): string =>
+  resolve(
+    runRoot,
+    "_pixverse",
+    ratioToSlug(aspectRatio),
+    `base-image${extname(downloadedPath) || ".png"}`,
+  );
 
 const createRunSummary = (variants: RunVariantManifest[]): RunManifest["summary"] => ({
   completed: variants.filter((variant) => variant.status === "completed").length,
@@ -154,7 +170,9 @@ const prepareGeneratedClip = async ({
   const tempDownloadDir = resolve(outputAssetsDir, ".downloads", ratioToSlug(aspectRatio), clip.id);
   await rm(tempDownloadDir, { force: true, recursive: true });
 
-  const downloadedPath = await downloadAsset(latestId, tempDownloadDir);
+  const downloadedPath = await downloadAsset(latestId, tempDownloadDir, {
+    extensions: VIDEO_EXTENSIONS,
+  });
   const outputPath = resolve(outputAssetsDir, targetName);
   await mkdir(outputAssetsDir, { recursive: true });
   await rename(downloadedPath, outputPath);
@@ -255,6 +273,8 @@ const prepareReferenceClip = async ({
 
 const executeVariant = async ({
   aspectRatio,
+  baseImageAssets,
+  baseImageIds,
   baseVideoIds,
   config,
   dryRun,
@@ -264,6 +284,8 @@ const executeVariant = async ({
   stageRoot,
 }: {
   aspectRatio: SupportedAspectRatio;
+  baseImageAssets: Map<SupportedAspectRatio, string>;
+  baseImageIds: Map<SupportedAspectRatio, string>;
   baseVideoIds: Map<SupportedAspectRatio, string>;
   config: LoadedConfig;
   dryRun: boolean;
@@ -389,6 +411,14 @@ const executeVariant = async ({
 
   return {
     aspectRatio,
+    baseImageAsset:
+      usesGeneratedClips && config.config.generation.image.enabled
+        ? baseImageAssets.get(aspectRatio) ?? null
+        : null,
+    baseImageId:
+      usesGeneratedClips && config.config.generation.image.enabled
+        ? baseImageIds.get(aspectRatio) ?? null
+        : null,
     baseVideoId: usesGeneratedClips ? baseVideoIds.get(aspectRatio) ?? null : null,
     clipAssets,
     clipVideoIds,
@@ -440,6 +470,8 @@ export const executePipeline = async (
       .map((variant) => variant.aspectRatio),
   );
 
+  const baseImageAssets = new Map<SupportedAspectRatio, string>();
+  const baseImageIds = new Map<SupportedAspectRatio, string>();
   const baseVideoIds = new Map<SupportedAspectRatio, string>();
 
   if (requiredRatios.size > 0 && !options.dryRun) {
@@ -452,7 +484,35 @@ export const executePipeline = async (
     }
 
     for (const aspectRatio of requiredRatios) {
-      const baseVideoId = await createBaseVideo(loaded.config, aspectRatio);
+      let baseImagePath: string | undefined;
+
+      if (loaded.config.generation.image.enabled) {
+        const baseImageId = await createBaseImage(loaded.config, aspectRatio);
+        await waitForTask(baseImageId);
+        baseImageIds.set(aspectRatio, baseImageId);
+
+        const tempDownloadDir = resolve(
+          runRoot,
+          ".downloads",
+          "base-image",
+          ratioToSlug(aspectRatio),
+        );
+        await rm(tempDownloadDir, { force: true, recursive: true });
+
+        const downloadedBaseImage = await downloadAsset(baseImageId, tempDownloadDir, {
+          extensions: IMAGE_EXTENSIONS,
+        });
+        const storedBaseImage = baseImageTargetPath(runRoot, aspectRatio, downloadedBaseImage);
+        await mkdir(dirname(storedBaseImage), { recursive: true });
+        await rm(storedBaseImage, { force: true, recursive: true });
+        await rename(downloadedBaseImage, storedBaseImage);
+        await rm(tempDownloadDir, { force: true, recursive: true });
+
+        baseImageAssets.set(aspectRatio, toPosix(relative(runRoot, storedBaseImage)));
+        baseImagePath = storedBaseImage;
+      }
+
+      const baseVideoId = await createBaseVideo(loaded.config, aspectRatio, baseImagePath);
       await waitForTask(baseVideoId);
       baseVideoIds.set(aspectRatio, baseVideoId);
     }
@@ -466,6 +526,8 @@ export const executePipeline = async (
     try {
       const result = await executeVariant({
         aspectRatio: variant.aspectRatio,
+        baseImageAssets,
+        baseImageIds,
         baseVideoIds,
         config: loaded,
         dryRun: options.dryRun ?? false,
@@ -478,6 +540,14 @@ export const executePipeline = async (
     } catch (error) {
       variants.push({
         aspectRatio: variant.aspectRatio,
+        baseImageAsset:
+          variant.usesGeneratedClips && loaded.config.generation.image.enabled
+            ? baseImageAssets.get(variant.aspectRatio) ?? null
+            : null,
+        baseImageId:
+          variant.usesGeneratedClips && loaded.config.generation.image.enabled
+            ? baseImageIds.get(variant.aspectRatio) ?? null
+            : null,
         baseVideoId: variant.usesGeneratedClips ? baseVideoIds.get(variant.aspectRatio) ?? null : null,
         clipAssets: {},
         clipVideoIds: {},

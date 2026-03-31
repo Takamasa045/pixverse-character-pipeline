@@ -8,6 +8,18 @@ export type Theme = {
   text: string;
 };
 
+export type PromptConfig = {
+  base: string;
+  perRatio?: Partial<Record<SupportedAspectRatio, string>>;
+};
+
+export type ImageGenerationConfig = {
+  enabled: boolean;
+  model: string;
+  prompt: PromptConfig;
+  quality: string;
+};
+
 export type GeneratedClipConfig = {
   audioFile?: string | null;
   audioVolume?: number;
@@ -71,11 +83,9 @@ export type LocaleConfig = {
 export type ProjectConfig = {
   generation: {
     ambientSound: string | null;
+    image: ImageGenerationConfig;
     model: string;
-    prompt: {
-      base: string;
-      perRatio?: Partial<Record<SupportedAspectRatio, string>>;
-    };
+    prompt: PromptConfig;
     quality: string;
     upscale: boolean;
   };
@@ -137,6 +147,8 @@ export type RunVariantStatus = "planned" | "completed" | "failed" | "skipped";
 
 export type RunVariantManifest = {
   aspectRatio: SupportedAspectRatio;
+  baseImageAsset: string | null;
+  baseImageId: string | null;
   baseVideoId: string | null;
   clipAssets: Record<string, string>;
   clipVideoIds: Record<string, ClipStageIds>;
@@ -187,11 +199,13 @@ export type PlannedVariant = {
 export type PipelinePlan = {
   baseJobs: BaseJobPlan[];
   referenceJobs: ReferenceJobPlan[];
+  imageJobs: BaseJobPlan[];
   sourceFormat: "legacy" | "project";
   totals: {
     baseJobs: number;
     generatedClipVariants: number;
     referenceJobs: number;
+    imageJobs: number;
     soundJobs: number;
     speechJobs: number;
     totalJobs: number;

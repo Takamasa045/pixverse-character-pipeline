@@ -43,6 +43,7 @@ pnpm test
 ## PixVerse CLI Coverage
 
 - `pixverse account info --json`
+- `pixverse create image`
 - `pixverse create video --image`
 - `pixverse create reference --images`
 - `pixverse create speech --tts-text`

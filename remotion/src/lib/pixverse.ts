@@ -1,11 +1,12 @@
 import { mkdir, readdir } from "node:fs/promises";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { remotionRoot } from "./paths";
 import { runCommand } from "./subprocess";
 import type {
   GeneratedClipConfig,
   ProjectConfig,
   ReferenceClipConfig,
+  PromptConfig,
   SupportedAspectRatio,
 } from "./types";
 
@@ -31,10 +32,10 @@ export const parseJsonOutput = (stdout: string): Record<string, unknown> => {
   }
 };
 
-const extractVideoId = (payload: Record<string, unknown>): string => {
+const extractTaskId = (payload: Record<string, unknown>): string => {
   const value = payload.video_id ?? payload.image_id ?? payload.id;
   if (!value) {
-    throw new Error(`PixVerse response did not contain a video id: ${JSON.stringify(payload)}`);
+    throw new Error(`PixVerse response did not contain an asset id: ${JSON.stringify(payload)}`);
   }
 
   return String(value);
@@ -69,15 +70,103 @@ const maxGeneratedDuration = (config: ProjectConfig): number =>
     ),
   );
 
-export const createBaseVideo = async (
+const resolvePrompt = (prompt: PromptConfig, aspectRatio: SupportedAspectRatio): string =>
+  prompt.perRatio?.[aspectRatio] ?? prompt.base;
+
+const findDownloadedAsset = async (
+  destinationDirectory: string,
+  extensions?: string[],
+): Promise<string> => {
+  const entries = await readdir(destinationDirectory, { withFileTypes: true });
+  const files = entries.filter((entry) => entry.isFile() && !entry.name.startsWith("."));
+
+  if (files.length === 0) {
+    throw new Error(`PixVerse download did not produce a file in ${destinationDirectory}.`);
+  }
+
+  if (extensions && extensions.length > 0) {
+    const normalizedExtensions = new Set(extensions.map((extension) => extension.toLowerCase()));
+    const matched = files.find((file) =>
+      normalizedExtensions.has(extname(file.name).toLowerCase()),
+    );
+
+    if (matched) {
+      return resolve(destinationDirectory, matched.name);
+    }
+  }
+
+  return resolve(destinationDirectory, files[0]!.name);
+};
+
+export const createBaseImage = async (
   config: ProjectConfig,
   aspectRatio: SupportedAspectRatio,
 ): Promise<string> => {
-  const prompt =
-    config.generation.prompt.perRatio?.[aspectRatio] ?? config.generation.prompt.base;
-  const duration = String(maxGeneratedDuration(config));
+  const prompt = resolvePrompt(config.generation.image.prompt, aspectRatio);
   const args =
     config.speaker.mode === "reference"
+      ? [
+          "create",
+          "image",
+          "--images",
+          ...config.speaker.images,
+          "--prompt",
+          prompt,
+          "--model",
+          config.generation.image.model,
+          "--quality",
+          config.generation.image.quality,
+          "--aspect-ratio",
+          aspectRatio,
+          "--no-wait",
+        ]
+      : [
+          "create",
+          "image",
+          "--image",
+          config.speaker.images[0],
+          "--prompt",
+          prompt,
+          "--model",
+          config.generation.image.model,
+          "--quality",
+          config.generation.image.quality,
+          "--aspect-ratio",
+          aspectRatio,
+          "--no-wait",
+        ];
+
+  const payload = await runPixverse(args);
+  return extractTaskId(payload);
+};
+
+export const createBaseVideo = async (
+  config: ProjectConfig,
+  aspectRatio: SupportedAspectRatio,
+  sourceImagePath?: string,
+): Promise<string> => {
+  const prompt = resolvePrompt(config.generation.prompt, aspectRatio);
+  const duration = String(maxGeneratedDuration(config));
+  const args =
+    sourceImagePath
+      ? [
+          "create",
+          "video",
+          "--image",
+          sourceImagePath,
+          "--prompt",
+          prompt,
+          "--model",
+          config.generation.model,
+          "--quality",
+          config.generation.quality,
+          "--duration",
+          duration,
+          "--aspect-ratio",
+          aspectRatio,
+          "--no-wait",
+        ]
+      : config.speaker.mode === "reference"
       ? [
           "create",
           "reference",
@@ -114,7 +203,7 @@ export const createBaseVideo = async (
         ];
 
   const payload = await runPixverse(args);
-  return extractVideoId(payload);
+  return extractTaskId(payload);
 };
 
 export const createReferenceVideo = async ({
@@ -144,11 +233,11 @@ export const createReferenceVideo = async ({
     "--no-wait",
   ]);
 
-  return extractVideoId(payload);
+  return extractTaskId(payload);
 };
 
-export const waitForTask = async (videoId: string): Promise<void> => {
-  await runPixverse(["task", "wait", videoId]);
+export const waitForTask = async (assetId: string): Promise<void> => {
+  await runPixverse(["task", "wait", assetId]);
 };
 
 export const createSpeech = async (
@@ -168,7 +257,7 @@ export const createSpeech = async (
   args.push("--no-wait");
 
   const payload = await runPixverse(args);
-  return extractVideoId(payload);
+  return extractTaskId(payload);
 };
 
 export const createSound = async (videoId: string, prompt: string): Promise<string> => {
@@ -183,7 +272,7 @@ export const createSound = async (videoId: string, prompt: string): Promise<stri
     "--no-wait",
   ]);
 
-  return extractVideoId(payload);
+  return extractTaskId(payload);
 };
 
 export const createUpscale = async (videoId: string, quality: string): Promise<string> => {
@@ -197,19 +286,17 @@ export const createUpscale = async (videoId: string, quality: string): Promise<s
     "--no-wait",
   ]);
 
-  return extractVideoId(payload);
+  return extractTaskId(payload);
 };
 
-export const downloadAsset = async (videoId: string, destinationDirectory: string): Promise<string> => {
+export const downloadAsset = async (
+  assetId: string,
+  destinationDirectory: string,
+  options?: {
+    extensions?: string[];
+  },
+): Promise<string> => {
   await mkdir(destinationDirectory, { recursive: true });
-  await runPixverse(["asset", "download", videoId, "--dest", destinationDirectory]);
-
-  const files = await readdir(destinationDirectory);
-  const downloaded = files.find((file) => file.toLowerCase().endsWith(".mp4"));
-
-  if (!downloaded) {
-    throw new Error(`PixVerse download for ${videoId} did not produce an mp4.`);
-  }
-
-  return resolve(destinationDirectory, downloaded);
+  await runPixverse(["asset", "download", assetId, "--dest", destinationDirectory]);
+  return findDownloadedAsset(destinationDirectory, options?.extensions);
 };
