@@ -149,16 +149,13 @@ export const buildStoryProjectConfig = (answers: StoryAnswers): ProjectConfig =>
   return {
     generation: {
       ambientSound: null,
-      image: {
-        ...DEFAULT_GENERATION.image,
-        enabled: false,
-      },
-      model: "v5.6",
+      image: DEFAULT_GENERATION.image,
+      model: DEFAULT_GENERATION.model,
       prompt: {
         base: `A reference-driven story teaser set in ${answers.setting}. ${answers.visualMood}`,
       },
-      quality: "1080p",
-      upscale: true,
+      quality: DEFAULT_GENERATION.quality,
+      upscale: DEFAULT_GENERATION.upscale,
     },
     locales: {
       [answers.locale]: {

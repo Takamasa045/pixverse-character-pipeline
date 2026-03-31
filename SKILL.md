@@ -119,7 +119,7 @@ pixverse create video \
   --aspect-ratio 16:9 \
   --model v6 \
   --duration [4-8] \
-  --quality 1080p \
+  --quality 720p \
   --no-wait --json
 ```
 
@@ -237,18 +237,18 @@ render:
 
 generation:
   model: v6
-  quality: 1080p
+  quality: 720p
   upscale: true
   ambientSound: null
   image:
     enabled: true
     model: gemini-3.1-flash
-    quality: 1080p
+    quality: 720p
   prompt:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-`generation.image.enabled: true` を指定すると、PixVerse `create image` でベース静止画を作ってから I2V に渡す。`generation.image.prompt` が未指定なら `generation.prompt` を使う。
+既定では `generation.image.enabled: true` で、PixVerse `create image` を `gemini-3.1-flash` で実行してベース静止画を作ってから I2V に渡す。`generation.image.prompt` が未指定なら `generation.prompt` を使う。動画生成の既定は `v6` / `720p`。
 
 `project.yaml` がない場合 → `references/interactive-questions.md` のフローでヒアリング。
 
@@ -303,9 +303,9 @@ pixverse create reference \
   --images [キャラ画像1..n] \
   --prompt "[シーン説明]. [キャラの動き]. [背景の動き]. [カメラワーク]." \
   --aspect-ratio 9:16 \
-  --model v5.6 \
+  --model v6 \
   --duration [4-6] \
-  --quality 1080p \
+  --quality 720p \
   --no-wait --json
 ```
 

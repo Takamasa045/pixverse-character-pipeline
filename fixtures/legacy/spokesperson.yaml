@@ -17,7 +17,7 @@ scripts:
 output:
   aspect_ratios: ["16:9", "9:16"]
   model: v6
-  quality: 1080p
+  quality: 720p
   duration: 5
   upscale: true
   ambient_sound: null

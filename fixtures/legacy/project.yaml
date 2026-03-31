@@ -34,7 +34,7 @@ render:
 
 generation:
   model: v6
-  quality: 1080p
+  quality: 720p
   upscale: true
   ambientSound: null
   prompt:

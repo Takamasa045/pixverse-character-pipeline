@@ -13,8 +13,10 @@ test("project.yaml and spokesperson.yaml normalize to the same internal config",
 
   assert.deepEqual(projectConfig.config, legacyConfig.config);
   assert.equal(projectConfig.config.generation.model, "v6");
-  assert.equal(projectConfig.config.generation.image.enabled, false);
+  assert.equal(projectConfig.config.generation.image.enabled, true);
   assert.equal(projectConfig.config.generation.image.model, "gemini-3.1-flash");
+  assert.equal(projectConfig.config.generation.quality, "720p");
+  assert.equal(projectConfig.config.generation.image.quality, "720p");
 });
 
 test("generated fixture enables base image generation and falls back to video prompt", async () => {
@@ -24,7 +26,7 @@ test("generated fixture enables base image generation and falls back to video pr
 
   assert.equal(generatedConfig.config.generation.image.enabled, true);
   assert.equal(generatedConfig.config.generation.image.model, "gemini-3.1-flash");
-  assert.equal(generatedConfig.config.generation.image.quality, "1080p");
+  assert.equal(generatedConfig.config.generation.image.quality, "720p");
   assert.equal(
     generatedConfig.config.generation.image.prompt.base,
     generatedConfig.config.generation.prompt.base,

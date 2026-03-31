@@ -354,7 +354,10 @@ const normalizeLegacyConfig = (raw: Record<string, unknown>, configDir: string):
       image: {
         enabled: DEFAULT_GENERATION.image.enabled,
         model: DEFAULT_GENERATION.image.model,
-        prompt: DEFAULT_GENERATION.image.prompt,
+        prompt: normalizePromptConfig(
+          undefined,
+          DEFAULT_GENERATION.image.enabled ? videoPrompt : DEFAULT_GENERATION.image.prompt,
+        ),
         quality: DEFAULT_GENERATION.image.quality,
       },
       model: asString(outputRaw.model) ?? DEFAULT_GENERATION.model,

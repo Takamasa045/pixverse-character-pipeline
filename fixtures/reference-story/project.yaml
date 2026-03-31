@@ -37,8 +37,8 @@ render:
   outputDir: ../../output
 
 generation:
-  model: v5.6
-  quality: 1080p
+  model: v6
+  quality: 720p
   upscale: false
   ambientSound: null
   prompt:
