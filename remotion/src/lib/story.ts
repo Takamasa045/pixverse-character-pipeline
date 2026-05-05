@@ -155,6 +155,7 @@ export const buildStoryProjectConfig = (answers: StoryAnswers): ProjectConfig =>
         base: `A reference-driven story teaser set in ${answers.setting}. ${answers.visualMood}`,
       },
       quality: DEFAULT_GENERATION.quality,
+      referenceModel: DEFAULT_GENERATION.referenceModel,
       upscale: DEFAULT_GENERATION.upscale,
     },
     locales: {
@@ -191,6 +192,7 @@ const stringifyProjectConfig = (config: ProjectConfig): string =>
       model: config.generation.model,
       prompt: config.generation.prompt,
       quality: config.generation.quality,
+      referenceModel: config.generation.referenceModel,
       upscale: config.generation.upscale,
     },
     locales: Object.fromEntries(

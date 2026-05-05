@@ -1,6 +1,14 @@
 export type OverlayStyle = "title" | "subtitle" | "lower-third" | "endcard" | "none";
 
-export type SupportedAspectRatio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "3:2" | "2:3";
+export type SupportedAspectRatio =
+  | "16:9"
+  | "9:16"
+  | "1:1"
+  | "4:3"
+  | "3:4"
+  | "3:2"
+  | "2:3"
+  | "21:9";
 
 export type Theme = {
   accent: string;
@@ -87,6 +95,7 @@ export type ProjectConfig = {
     model: string;
     prompt: PromptConfig;
     quality: string;
+    referenceModel: string;
     upscale: boolean;
   };
   locales: Record<string, LocaleConfig>;

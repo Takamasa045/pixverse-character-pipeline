@@ -5,7 +5,9 @@ When `project.yaml` is not provided, collect inputs in this order and convert th
 Default unless the user clearly asks otherwise:
 - one or more attached character images => `speaker.mode: single`
 - use PixVerse I2I first with `generation.image.model: gemini-3.1-flash`
+- use `generation.image.quality: 1080p` for the default `gemini-3.1-flash` image step
 - keep `generation.model: v6`
+- use `generation.referenceModel: pixverse-c1` for `source: reference` because PixVerse CLI 1.1.x does not support `v6` for `create reference`
 - do not switch to `reference` mode only because an image was attached
 
 If the user asks for a story, teaser, trailer, or multi-cut video, default to a reference-driven per-cut workflow:
@@ -82,19 +84,23 @@ For story-mode, also extract:
 
 > Generation settings:
 > - Model: `v6`
+> - Reference model: `pixverse-c1`
 > - Quality: `720p`
 > - Upscale: `yes`
 > - Ambient sound: `none`
 > - Base image model: `gemini-3.1-flash` (ask only if an override is needed)
+> - Base image quality: `1080p`
 >
 > Reply with changes or say `ok`.
 
 **Extract**
 - `generation.model`
+- `generation.referenceModel`
 - `generation.quality`
 - `generation.upscale`
 - `generation.ambientSound`
 - `generation.image.model` when the user wants a non-default PixVerse image model
+- `generation.image.quality`
 - `generation.prompt.base`
 - `generation.prompt.perRatio`
 

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { remotionRoot } from "./paths";
@@ -10,7 +11,24 @@ import type {
   SupportedAspectRatio,
 } from "./types";
 
-const pixverseBinary = () => process.env.PIXVERSE_BIN?.trim() || "pixverse";
+type PixverseAssetType = "image" | "video";
+
+const localPixverseBinary = resolve(
+  remotionRoot,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "pixverse.cmd" : "pixverse",
+);
+
+const pixverseBinary = () => {
+  const configuredBinary = process.env.PIXVERSE_BIN?.trim();
+
+  if (configuredBinary) {
+    return configuredBinary;
+  }
+
+  return existsSync(localPixverseBinary) ? localPixverseBinary : "pixverse";
+};
 
 export const parseJsonOutput = (stdout: string): Record<string, unknown> => {
   const trimmed = stdout.trim();
@@ -33,7 +51,12 @@ export const parseJsonOutput = (stdout: string): Record<string, unknown> => {
 };
 
 const extractTaskId = (payload: Record<string, unknown>): string => {
-  const value = payload.video_id ?? payload.image_id ?? payload.id;
+  const value =
+    payload.video_id ??
+    payload.image_id ??
+    payload.asset_id ??
+    payload.task_id ??
+    payload.id;
   if (!value) {
     throw new Error(`PixVerse response did not contain an asset id: ${JSON.stringify(payload)}`);
   }
@@ -141,71 +164,109 @@ export const createBaseImage = async (
   return extractTaskId(payload);
 };
 
+export const buildCreateBaseVideoArgs = (
+  config: ProjectConfig,
+  aspectRatio: SupportedAspectRatio,
+  sourceImagePath?: string,
+): string[] => {
+  const prompt = resolvePrompt(config.generation.prompt, aspectRatio);
+  const duration = String(maxGeneratedDuration(config));
+
+  if (sourceImagePath) {
+    return [
+      "create",
+      "video",
+      "--image",
+      sourceImagePath,
+      "--prompt",
+      prompt,
+      "--model",
+      config.generation.model,
+      "--quality",
+      config.generation.quality,
+      "--duration",
+      duration,
+      "--aspect-ratio",
+      aspectRatio,
+      "--no-wait",
+    ];
+  }
+
+  if (config.speaker.mode === "reference") {
+    return [
+      "create",
+      "reference",
+      "--images",
+      ...config.speaker.images,
+      "--prompt",
+      prompt,
+      "--model",
+      config.generation.referenceModel,
+      "--quality",
+      config.generation.quality,
+      "--duration",
+      duration,
+      "--aspect-ratio",
+      aspectRatio,
+      "--no-wait",
+    ];
+  }
+
+  return [
+    "create",
+    "video",
+    "--image",
+    config.speaker.images[0],
+    "--prompt",
+    prompt,
+    "--model",
+    config.generation.model,
+    "--quality",
+    config.generation.quality,
+    "--duration",
+    duration,
+    "--aspect-ratio",
+    aspectRatio,
+    "--no-wait",
+  ];
+};
+
 export const createBaseVideo = async (
   config: ProjectConfig,
   aspectRatio: SupportedAspectRatio,
   sourceImagePath?: string,
 ): Promise<string> => {
-  const prompt = resolvePrompt(config.generation.prompt, aspectRatio);
-  const duration = String(maxGeneratedDuration(config));
-  const args =
-    sourceImagePath
-      ? [
-          "create",
-          "video",
-          "--image",
-          sourceImagePath,
-          "--prompt",
-          prompt,
-          "--model",
-          config.generation.model,
-          "--quality",
-          config.generation.quality,
-          "--duration",
-          duration,
-          "--aspect-ratio",
-          aspectRatio,
-          "--no-wait",
-        ]
-      : config.speaker.mode === "reference"
-      ? [
-          "create",
-          "reference",
-          "--images",
-          ...config.speaker.images,
-          "--prompt",
-          prompt,
-          "--model",
-          config.generation.model,
-          "--quality",
-          config.generation.quality,
-          "--duration",
-          duration,
-          "--aspect-ratio",
-          aspectRatio,
-          "--no-wait",
-        ]
-      : [
-          "create",
-          "video",
-          "--image",
-          config.speaker.images[0],
-          "--prompt",
-          prompt,
-          "--model",
-          config.generation.model,
-          "--quality",
-          config.generation.quality,
-          "--duration",
-          duration,
-          "--aspect-ratio",
-          aspectRatio,
-          "--no-wait",
-        ];
-
-  const payload = await runPixverse(args);
+  const payload = await runPixverse(
+    buildCreateBaseVideoArgs(config, aspectRatio, sourceImagePath),
+  );
   return extractTaskId(payload);
 };
+
+export const buildCreateReferenceVideoArgs = ({
+  aspectRatio,
+  clip,
+  config,
+}: {
+  aspectRatio: SupportedAspectRatio;
+  clip: ReferenceClipConfig;
+  config: ProjectConfig;
+}): string[] => [
+  "create",
+  "reference",
+  "--images",
+  ...config.speaker.images,
+  "--prompt",
+  clip.prompt,
+  "--model",
+  config.generation.referenceModel,
+  "--quality",
+  config.generation.quality,
+  "--duration",
+  String(Math.max(1, Math.round(clip.durationSeconds))),
+  "--aspect-ratio",
+  aspectRatio,
+  "--no-wait",
+];
 
 export const createReferenceVideo = async ({
   aspectRatio,
@@ -216,29 +277,17 @@ export const createReferenceVideo = async ({
   clip: ReferenceClipConfig;
   config: ProjectConfig;
 }): Promise<string> => {
-  const payload = await runPixverse([
-    "create",
-    "reference",
-    "--images",
-    ...config.speaker.images,
-    "--prompt",
-    clip.prompt,
-    "--model",
-    config.generation.model,
-    "--quality",
-    config.generation.quality,
-    "--duration",
-    String(Math.max(1, Math.round(clip.durationSeconds))),
-    "--aspect-ratio",
-    aspectRatio,
-    "--no-wait",
-  ]);
-
+  const payload = await runPixverse(
+    buildCreateReferenceVideoArgs({ aspectRatio, clip, config }),
+  );
   return extractTaskId(payload);
 };
 
-export const waitForTask = async (assetId: string): Promise<void> => {
-  await runPixverse(["task", "wait", assetId]);
+export const waitForTask = async (
+  assetId: string,
+  assetType: PixverseAssetType = "video",
+): Promise<void> => {
+  await runPixverse(["task", "wait", assetId, "--type", assetType]);
 };
 
 export const createSpeech = async (
@@ -294,10 +343,18 @@ export const downloadAsset = async (
   assetId: string,
   destinationDirectory: string,
   options?: {
+    assetType?: PixverseAssetType;
     extensions?: string[];
   },
 ): Promise<string> => {
   await mkdir(destinationDirectory, { recursive: true });
-  await runPixverse(["asset", "download", assetId, "--dest", destinationDirectory]);
+  await runPixverse([
+    "asset",
+    "download",
+    assetId,
+    "--dest",
+    destinationDirectory,
+    ...(options?.assetType ? ["--type", options.assetType] : []),
+  ]);
   return findDownloadedAsset(destinationDirectory, options?.extensions);
 };

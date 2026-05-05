@@ -17,13 +17,14 @@ export const DEFAULT_GENERATION = {
     prompt: {
       base: "A photoreal live-action scene featuring the provided character naturally composited into the environment, camera-ready for subsequent image-to-video animation, with realistic depth, clean composition, and polished cinematic lighting",
     },
-    quality: "720p",
+    quality: "1080p",
   },
   model: "v6",
   prompt: {
     base: "A talking character derived from the provided character image, speaking directly to camera with subtle head movements and natural blinking, placed in a photoreal live-action environment with realistic depth, clean composition, and polished cinematic lighting",
   },
   quality: "720p",
+  referenceModel: "pixverse-c1",
   upscale: true,
 };
 
@@ -35,4 +36,5 @@ export const SUPPORTED_ASPECT_RATIOS: SupportedAspectRatio[] = [
   "3:4",
   "3:2",
   "2:3",
+  "21:9",
 ];

@@ -265,6 +265,8 @@ const normalizeProjectConfig = (raw: Record<string, unknown>, configDir: string)
       model: asString(generationRaw.model) ?? DEFAULT_GENERATION.model,
       prompt: videoPrompt,
       quality: asString(generationRaw.quality) ?? DEFAULT_GENERATION.quality,
+      referenceModel:
+        asString(generationRaw.referenceModel) ?? DEFAULT_GENERATION.referenceModel,
       upscale: asBoolean(generationRaw.upscale) ?? DEFAULT_GENERATION.upscale,
     },
     locales,
@@ -364,6 +366,8 @@ const normalizeLegacyConfig = (raw: Record<string, unknown>, configDir: string):
         videoPrompt,
       ),
       quality: asString(outputRaw.quality) ?? DEFAULT_GENERATION.quality,
+      referenceModel:
+        asString(outputRaw.reference_model) ?? DEFAULT_GENERATION.referenceModel,
       upscale: asBoolean(outputRaw.upscale) ?? DEFAULT_GENERATION.upscale,
     },
     locales,
@@ -495,6 +499,7 @@ export const describeConfigForCli = (loaded: LoadedConfig) => ({
     },
     model: loaded.config.generation.model,
     quality: loaded.config.generation.quality,
+    referenceModel: loaded.config.generation.referenceModel,
     upscale: loaded.config.generation.upscale,
   },
   locales: Object.keys(loaded.config.locales),

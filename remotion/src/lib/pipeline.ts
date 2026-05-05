@@ -175,6 +175,7 @@ const prepareGeneratedClip = async ({
   await rm(tempDownloadDir, { force: true, recursive: true });
 
   const downloadedPath = await downloadAsset(latestId, tempDownloadDir, {
+    assetType: "video",
     extensions: VIDEO_EXTENSIONS,
   });
   const outputPath = resolve(outputAssetsDir, targetName);
@@ -253,7 +254,10 @@ const prepareReferenceClip = async ({
   const tempDownloadDir = resolve(outputAssetsDir, ".downloads", ratioToSlug(aspectRatio), clip.id);
   await rm(tempDownloadDir, { force: true, recursive: true });
 
-  const downloadedPath = await downloadAsset(latestId, tempDownloadDir);
+  const downloadedPath = await downloadAsset(latestId, tempDownloadDir, {
+    assetType: "video",
+    extensions: VIDEO_EXTENSIONS,
+  });
   const outputPath = resolve(outputAssetsDir, targetName);
   await mkdir(outputAssetsDir, { recursive: true });
   await rename(downloadedPath, outputPath);
@@ -492,7 +496,7 @@ export const executePipeline = async (
 
       if (loaded.config.generation.image.enabled) {
         const baseImageId = await createBaseImage(loaded.config, aspectRatio);
-        await waitForTask(baseImageId);
+        await waitForTask(baseImageId, "image");
         baseImageIds.set(aspectRatio, baseImageId);
 
         const tempDownloadDir = resolve(
@@ -504,6 +508,7 @@ export const executePipeline = async (
         await rm(tempDownloadDir, { force: true, recursive: true });
 
         const downloadedBaseImage = await downloadAsset(baseImageId, tempDownloadDir, {
+          assetType: "image",
           extensions: IMAGE_EXTENSIONS,
         });
         const storedBaseImage = baseImageTargetPath(runRoot, aspectRatio, downloadedBaseImage);

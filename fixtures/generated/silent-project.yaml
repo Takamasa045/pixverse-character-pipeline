@@ -35,6 +35,6 @@ generation:
   image:
     enabled: true
     model: gemini-3.1-flash
-    quality: 720p
+    quality: 1080p
   prompt:
     base: A silent talking character derived from the provided character image, facing camera in a photoreal live-action environment with subtle natural movement and no spoken narration

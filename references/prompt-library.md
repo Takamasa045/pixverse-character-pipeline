@@ -6,7 +6,7 @@
 
 用途:
 - `pixverse create image --image <path>` または `--images <paths...>` で 3面図を作る
-- `generation.image.model` は PixVerse CLI の image model を使う。既定値は `gemini-3.1-flash`
+- `generation.image.model` は PixVerse CLI の image model を使う。この workflow の既定値は `gemini-3.1-flash` / `1080p`
 
 必須要素:
 - `"character turnaround sheet"` または同等の参照シート表現
@@ -59,7 +59,7 @@ A talking character derived from the provided character image, speaking directly
 
 ### Phase 3 / Mode C: Per-Cut Reference Prompt
 
-ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。
+ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。PixVerse CLI 1.1.x では `create reference` に `generation.referenceModel` (`pixverse-c1` 既定) を使い、通常動画用の `v6` とは分ける。
 
 テンプレート:
 ```

@@ -15,10 +15,11 @@ test("project.yaml and spokesperson.yaml normalize to the same internal config",
 
   assert.deepEqual(projectConfig.config, legacyConfig.config);
   assert.equal(projectConfig.config.generation.model, "v6");
+  assert.equal(projectConfig.config.generation.referenceModel, "pixverse-c1");
   assert.equal(projectConfig.config.generation.image.enabled, true);
   assert.equal(projectConfig.config.generation.image.model, "gemini-3.1-flash");
   assert.equal(projectConfig.config.generation.quality, "720p");
-  assert.equal(projectConfig.config.generation.image.quality, "720p");
+  assert.equal(projectConfig.config.generation.image.quality, "1080p");
 });
 
 test("generated fixture enables base image generation and falls back to video prompt", async () => {
@@ -28,7 +29,7 @@ test("generated fixture enables base image generation and falls back to video pr
 
   assert.equal(generatedConfig.config.generation.image.enabled, true);
   assert.equal(generatedConfig.config.generation.image.model, "gemini-3.1-flash");
-  assert.equal(generatedConfig.config.generation.image.quality, "720p");
+  assert.equal(generatedConfig.config.generation.image.quality, "1080p");
   assert.equal(
     generatedConfig.config.generation.image.prompt.base,
     generatedConfig.config.generation.prompt.base,
@@ -79,4 +80,42 @@ generation:
   assert.equal(loaded.config.generation.image.enabled, true);
   assert.equal(loaded.config.generation.image.model, "gemini-3.1-flash");
   assert.equal(loaded.config.generation.model, "v6");
+  assert.equal(loaded.config.generation.referenceModel, "pixverse-c1");
+});
+
+test("21:9 is accepted for V6-compatible wide renders", async (t) => {
+  const tempDir = await mkdtemp(resolve(tmpdir(), "pixverse-wide-ratio-"));
+  t.after(async () => {
+    await rm(tempDir, { force: true, recursive: true });
+  });
+
+  const configPath = resolve(tempDir, "project.yaml");
+  await writeFile(
+    configPath,
+    `
+project:
+  slug: wide-ratio
+  title: Wide Ratio
+  date: "2026-05-05"
+
+speaker:
+  images:
+    - ${resolve(process.cwd(), "../fixtures/shared/assets/speaker.svg")}
+
+locales:
+  en:
+    clips:
+      - id: opener
+        source: generated
+        durationSeconds: 2
+        text: Wide render.
+
+render:
+  aspectRatios: ["21:9"]
+`,
+    "utf8",
+  );
+
+  const loaded = await loadProjectConfig(configPath);
+  assert.deepEqual(loaded.config.render.aspectRatios, ["21:9"]);
 });

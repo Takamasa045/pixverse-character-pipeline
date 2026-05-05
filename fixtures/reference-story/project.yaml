@@ -38,6 +38,7 @@ render:
 
 generation:
   model: v6
+  referenceModel: pixverse-c1
   quality: 720p
   upscale: false
   ambientSound: null

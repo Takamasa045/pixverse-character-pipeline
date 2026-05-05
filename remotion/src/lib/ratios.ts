@@ -8,6 +8,7 @@ const DIMENSIONS: Record<SupportedAspectRatio, { height: number; width: number }
   "3:4": { width: 1080, height: 1440 },
   "3:2": { width: 1620, height: 1080 },
   "2:3": { width: 1080, height: 1620 },
+  "21:9": { width: 2520, height: 1080 },
 };
 
 export const getDimensionsForRatio = (aspectRatio: SupportedAspectRatio) => DIMENSIONS[aspectRatio];

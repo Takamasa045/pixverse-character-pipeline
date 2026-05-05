@@ -31,3 +31,26 @@ test("render manifest is deterministic for local asset config", async () => {
   assert.equal(manifest.width, 1920);
   assert.equal(manifest.height, 1080);
 });
+
+test("render manifest supports 21:9 dimensions", async () => {
+  const loaded = await loadProjectConfig(resolve(process.cwd(), "../fixtures/basic/project.yaml"));
+  const locale = loaded.config.locales.en;
+
+  const manifest = buildRenderManifest({
+    aspectRatio: "21:9",
+    assets: {
+      bgmPublicPath: null,
+      clipAssetPublicPaths: {
+        intro: "preview/intro.mp4",
+        endcard: "preview/endcard.svg",
+      },
+      speakerImagePublicPath: "preview/speaker.svg",
+    },
+    config: loaded.config,
+    language: "en",
+    locale,
+  });
+
+  assert.equal(manifest.width, 2520);
+  assert.equal(manifest.height, 1080);
+});

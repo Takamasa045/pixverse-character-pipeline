@@ -116,10 +116,11 @@ BGM は assets/bgm.mp3 を使ってください。
 
 1. 複数画像でも既定では `speaker.mode: single` として扱う
 2. `generation.model: v6` を維持する
-3. `generation.image.enabled: true` を維持する
-4. `generation.image.model` の既定値は `gemini-3.1-flash`
-5. PixVerse の I2I (`create image`) でベース静止画を作ってから、I2V (`create video --image`) を実行する
-6. ユーザーが明示的に story / teaser / trailer / multi-cut を要求した場合、または複数の参照画像を渡した場合を除き、`source: reference` や `pixverse create reference` に切り替えない
+3. `source: reference` では `generation.referenceModel: pixverse-c1` を使う。PixVerse CLI 1.1.x の `create reference` は `v6` 非対応
+4. `generation.image.enabled: true` を維持する
+5. この workflow の `generation.image.model` 既定値は `gemini-3.1-flash`、`generation.image.quality` 既定値は `1080p`。PixVerse CLI 1.1.x では `qwen-image`、`gpt-image-2.0`、`gemini-3.0`、Seedream/Kling 系 image model も利用できる
+6. PixVerse の I2I (`create image`) でベース静止画を作ってから、I2V (`create video --image`) を実行する
+7. ユーザーが明示的に story / teaser / trailer / multi-cut を要求した場合、または複数の参照画像を渡した場合を除き、`source: reference` や `pixverse create reference` に切り替えない
 
 シェルの Node / PATH 解決が不安定な環境では、`pnpm pipeline:*` ではなく `./bin/pipeline` を正式入口として使います。
 
@@ -224,20 +225,23 @@ render:
 
 generation:
   model: v6
+  referenceModel: pixverse-c1
   quality: 720p
   upscale: true
   ambientSound: null
   image:
     enabled: true
     model: gemini-3.1-flash
-    quality: 720p
+    quality: 1080p
   prompt:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を共有ベース動画向けの動画用プロンプトとして使います。既定では PixVerse の I2I → I2V フローで、`generation.image.enabled` は `true` です。そのため、まず `generation.image.*` を使ってベース静止画を作ってローカルに保存し、その静止画から I2V を実行します。`generation.image.model` は PixVerse CLI に渡す image model 名で、既定値は `gemini-3.1-flash` です。`qwen-image` や `seedream-5.0-lite` など、他の PixVerse image model も利用できます。`generation.image.prompt` を省略した場合は `generation.prompt` がフォールバックとして使われます。動画生成の既定プロファイルは `v6` の `720p` です。
+PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を共有ベース動画向けの動画用プロンプトとして使います。既定では PixVerse の I2I → I2V フローで、`generation.image.enabled` は `true` です。そのため、まず `generation.image.*` を使ってベース静止画を作ってローカルに保存し、その静止画から I2V を実行します。`generation.image.model` は PixVerse CLI に渡す image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p` です。PixVerse CLI 1.1.x では `qwen-image`、`gpt-image-2.0`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども利用できます。`generation.image.prompt` を省略した場合は `generation.prompt` がフォールバックとして使われます。動画生成の既定プロファイルは `v6` の `720p` です。
 
-`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
+`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。`create reference` は `create video` と対応モデルが別なので、`generation.referenceModel` (`pixverse-c1` 既定) を使います。`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
+
+PixVerse CLI の全モデル表、mode matrix、source 差分メモは [`references/model-support.md`](./references/model-support.md) を参照してください。
 
 ## 出力
 
@@ -283,7 +287,7 @@ PixVerse CLI は Web と同じ credit を使います。大量実行の前に、
 インストール:
 
 ```bash
-npm install -g pixverse
+npm install -g pixverse@latest
 pixverse --version
 ```
 
@@ -313,8 +317,7 @@ cd remotion
 pnpm install
 ```
 
-PixVerse を使う場合は `pixverse` を PATH 上に置くか、`PIXVERSE_BIN=/path/to/pixverse` を設定します。  
-すでに `pixverse` コマンドが通っていれば、そのままこのリポから利用できます。
+`pnpm install` で、この repo が pin している PixVerse CLI (`pixverse@^1.1.6`) も入ります。`./bin/pipeline` は `PIXVERSE_BIN` があればそれを使い、未指定なら `remotion/node_modules/.bin/pixverse`、最後に PATH 上の `pixverse` を使います。
 
 ## CLI を直接使いたいとき
 

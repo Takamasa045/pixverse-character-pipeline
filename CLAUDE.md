@@ -17,7 +17,7 @@ pnpm install
 pixverse auth login
 ```
 
-If `pixverse` is not on `PATH`, set `PIXVERSE_BIN=/path/to/pixverse`.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.6`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
 
 ## Standard Workflow
 
@@ -30,7 +30,7 @@ If `pixverse` is not on `PATH`, set `PIXVERSE_BIN=/path/to/pixverse`.
 ## Clip Modes
 
 - `generated`: shared I2V pipeline. Can use PixVerse TTS, `audioFile`, or be silent.
-- `reference`: per-cut PixVerse reference generation for story / teaser / trailer workflows.
+- `reference`: per-cut PixVerse reference generation for story / teaser / trailer workflows. Uses `generation.referenceModel` (`pixverse-c1` by default), not the shared `generation.model`.
 - `video` / `image`: local assets only.
 
 ## Recommended Sub-Agent Split
