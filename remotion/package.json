@@ -8,6 +8,7 @@
     "pipeline:validate": "./bin/pipeline validate",
     "pipeline:plan": "./bin/pipeline plan",
     "pipeline:run": "./bin/pipeline run",
+    "pipeline:story": "./bin/pipeline story",
     "pipeline:render": "./bin/pipeline render",
     "test": "node --import tsx --test src/test/*.test.ts",
     "typecheck": "tsc --noEmit"
@@ -24,7 +25,7 @@
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "pixverse": "^1.1.6",
+    "pixverse": "^1.1.10",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

@@ -15,7 +15,8 @@ test("project.yaml and spokesperson.yaml normalize to the same internal config",
 
   assert.deepEqual(projectConfig.config, legacyConfig.config);
   assert.equal(projectConfig.config.generation.model, "v6");
-  assert.equal(projectConfig.config.generation.referenceModel, "pixverse-c1");
+  assert.equal(projectConfig.config.generation.referenceModel, "v6");
+  assert.equal(projectConfig.config.generation.generateAudio, false);
   assert.equal(projectConfig.config.generation.image.enabled, true);
   assert.equal(projectConfig.config.generation.image.model, "gemini-3.1-flash");
   assert.equal(projectConfig.config.generation.quality, "720p");
@@ -80,7 +81,7 @@ generation:
   assert.equal(loaded.config.generation.image.enabled, true);
   assert.equal(loaded.config.generation.image.model, "gemini-3.1-flash");
   assert.equal(loaded.config.generation.model, "v6");
-  assert.equal(loaded.config.generation.referenceModel, "pixverse-c1");
+  assert.equal(loaded.config.generation.referenceModel, "v6");
 });
 
 test("21:9 is accepted for V6-compatible wide renders", async (t) => {

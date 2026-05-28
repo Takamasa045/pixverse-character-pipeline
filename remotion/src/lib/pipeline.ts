@@ -5,7 +5,6 @@ import {
   createBaseImage,
   createBaseVideo,
   createReferenceVideo,
-  createSound,
   createSpeech,
   createUpscale,
   downloadAsset,
@@ -150,19 +149,12 @@ const prepareGeneratedClip = async ({
 
   let latestId = baseVideoId;
   let speechId: string | null = null;
-  let soundId: string | null = null;
   let upscaleId: string | null = null;
 
   if (clipNeedsSpeech(clip)) {
     speechId = await createSpeech(baseVideoId, clip);
     await waitForTask(speechId);
     latestId = speechId;
-  }
-
-  if (config.generation.ambientSound) {
-    soundId = await createSound(latestId, config.generation.ambientSound);
-    await waitForTask(soundId);
-    latestId = soundId;
   }
 
   if (config.generation.upscale) {
@@ -192,7 +184,7 @@ const prepareGeneratedClip = async ({
     publicPath: relativeToPublic(stagePath),
     stageIds: {
       final: latestId,
-      sound: soundId,
+      sound: null,
       speech: speechId,
       upscale: upscaleId,
     },
@@ -230,19 +222,12 @@ const prepareReferenceClip = async ({
 
   let latestId = baseVideoId;
   let speechId: string | null = null;
-  let soundId: string | null = null;
   let upscaleId: string | null = null;
 
   if (clipNeedsSpeech(clip)) {
     speechId = await createSpeech(latestId, clip);
     await waitForTask(speechId);
     latestId = speechId;
-  }
-
-  if (config.generation.ambientSound) {
-    soundId = await createSound(latestId, config.generation.ambientSound);
-    await waitForTask(soundId);
-    latestId = soundId;
   }
 
   if (config.generation.upscale) {
@@ -272,7 +257,7 @@ const prepareReferenceClip = async ({
     publicPath: relativeToPublic(stagePath),
     stageIds: {
       final: latestId,
-      sound: soundId,
+      sound: null,
       speech: speechId,
       upscale: upscaleId,
     },

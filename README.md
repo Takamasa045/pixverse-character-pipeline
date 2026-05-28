@@ -81,9 +81,9 @@ Default behavior for attached character image(s):
 
 1. Treat it as `speaker.mode: single` by default, even when multiple images are attached
 2. Keep `generation.model: v6`
-3. Use `generation.referenceModel: pixverse-c1` for `source: reference` clips because PixVerse CLI 1.1.x does not support `v6` for `create reference`
+3. Use `generation.referenceModel: v6` for `source: reference` clips; set `pixverse-c1` only when you explicitly want C1-style cinematic reference behavior
 4. Keep `generation.image.enabled: true`
-5. Default this workflow's `generation.image.model` to `gemini-3.1-flash` and `generation.image.quality` to `1080p` (PixVerse CLI 1.1.x also supports `qwen-image`, `gpt-image-2.0`, `gemini-3.0`, and Seedream/Kling image models)
+5. Default this workflow's `generation.image.model` to `gemini-3.1-flash` and `generation.image.quality` to `1080p` (PixVerse CLI 1.1.10 also supports `qwen-image`, `gpt-image-2.0`, `gemini-3.0`, and Seedream/Kling image models)
 6. Start from PixVerse I2I (`create image`) and then run I2V (`create video --image`)
 7. Do not switch to `source: reference` or `pixverse create reference` unless the user explicitly asks for a story / teaser / trailer / multi-cut workflow or provides multiple reference images
 
@@ -102,12 +102,14 @@ Prerequisites:
 - Node.js 20+
 - PixVerse account with active subscription
 
+The recommended path is the repo-local CLI installed by `pnpm install` in step 3. If you need a global CLI for manual checks, use:
+
 ```bash
-npm install -g pixverse@latest
+npm install -g pixverse
 pixverse --version
 ```
 
-Or use `npx pixverse` to avoid global install.
+Or use `npx pixverse@latest` to avoid global install.
 
 ### 2. Login
 
@@ -129,7 +131,7 @@ cd remotion
 pnpm install
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.6`). `./bin/pipeline` uses `PIXVERSE_BIN` when set, otherwise it prefers `remotion/node_modules/.bin/pixverse`, then falls back to `pixverse` on PATH.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.10`). `./bin/pipeline` uses `PIXVERSE_BIN` when set, otherwise it prefers `remotion/node_modules/.bin/pixverse`, then falls back to `pixverse` on PATH.
 
 ## Main Commands
 
@@ -201,10 +203,10 @@ render:
 
 generation:
   model: v6
-  referenceModel: pixverse-c1
+  referenceModel: v6
   quality: 720p
   upscale: true
-  ambientSound: null
+  generateAudio: false
   image:
     enabled: true
     model: gemini-3.1-flash
@@ -213,9 +215,9 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name; this workflow defaults to `gemini-3.1-flash` at `1080p`, while PixVerse CLI 1.1.x also supports current image models such as `qwen-image`, `gpt-image-2.0`, `gemini-3.0`, `seedream-5.0-lite`, and Kling image models. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
+PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name; this workflow defaults to `gemini-3.1-flash` at `1080p`, while PixVerse CLI 1.1.10 also supports current image models such as `qwen-image`, `gpt-image-2.0`, `gemini-3.0`, `seedream-5.0-lite`, and Kling image models. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
 
-`source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. They use `generation.referenceModel` (`pixverse-c1` by default) because `create reference` has a separate model matrix from `create video`. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
+`source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. They use `generation.referenceModel` (`v6` by default; `pixverse-c1` remains available as an override). `generateAudio: true` maps to PixVerse CLI `--audio`; the default `false` maps to `--no-audio`. The legacy `ambientSound` field is accepted as a compatibility alias, but the pipeline no longer calls the removed `create sound` command. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
 
 For the full PixVerse CLI model table, mode matrix, and source reconciliation notes, see [`references/model-support.md`](./references/model-support.md).
 

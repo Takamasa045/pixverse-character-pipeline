@@ -148,7 +148,7 @@ export const buildStoryProjectConfig = (answers: StoryAnswers): ProjectConfig =>
 
   return {
     generation: {
-      ambientSound: null,
+      generateAudio: DEFAULT_GENERATION.generateAudio,
       image: DEFAULT_GENERATION.image,
       model: DEFAULT_GENERATION.model,
       prompt: {
@@ -187,7 +187,7 @@ export const buildStoryProjectConfig = (answers: StoryAnswers): ProjectConfig =>
 const stringifyProjectConfig = (config: ProjectConfig): string =>
   YAML.stringify({
     generation: {
-      ambientSound: config.generation.ambientSound,
+      generateAudio: config.generation.generateAudio,
       image: config.generation.image,
       model: config.generation.model,
       prompt: config.generation.prompt,

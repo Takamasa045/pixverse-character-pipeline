@@ -35,6 +35,8 @@ export const renderVariant = async ({
       String(manifest.width),
       "--height",
       String(manifest.height),
+      "--timeout",
+      "120000",
     ],
     {
       captureOutput: true,

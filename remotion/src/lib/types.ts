@@ -90,7 +90,7 @@ export type LocaleConfig = {
 
 export type ProjectConfig = {
   generation: {
-    ambientSound: string | null;
+    generateAudio: boolean;
     image: ImageGenerationConfig;
     model: string;
     prompt: PromptConfig;
@@ -215,6 +215,7 @@ export type PipelinePlan = {
     generatedClipVariants: number;
     referenceJobs: number;
     imageJobs: number;
+    audioJobs: number;
     soundJobs: number;
     speechJobs: number;
     totalJobs: number;

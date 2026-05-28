@@ -7,7 +7,8 @@ Default unless the user clearly asks otherwise:
 - use PixVerse I2I first with `generation.image.model: gemini-3.1-flash`
 - use `generation.image.quality: 1080p` for the default `gemini-3.1-flash` image step
 - keep `generation.model: v6`
-- use `generation.referenceModel: pixverse-c1` for `source: reference` because PixVerse CLI 1.1.x does not support `v6` for `create reference`
+- use `generation.referenceModel: v6` for `source: reference`; `pixverse-c1` is an explicit override for C1-style reference generation
+- use `generation.generateAudio: false` unless the user wants PixVerse-generated audio from the video/reference generation step
 - do not switch to `reference` mode only because an image was attached
 
 If the user asks for a story, teaser, trailer, or multi-cut video, default to a reference-driven per-cut workflow:
@@ -28,7 +29,7 @@ If the user asks for a story, teaser, trailer, or multi-cut video, default to a 
 ## Group 2: Speaker
 
 **Ask**
-> Provide 1-7 character image paths. I will use 1 image for `single` mode and 2-7 for `reference` mode.
+> Provide 1-7 character image paths. I will default to `single` mode unless you explicitly want reference-driven story generation.
 
 **Extract**
 - `speaker.images`
@@ -84,10 +85,10 @@ For story-mode, also extract:
 
 > Generation settings:
 > - Model: `v6`
-> - Reference model: `pixverse-c1`
+> - Reference model: `v6`
 > - Quality: `720p`
 > - Upscale: `yes`
-> - Ambient sound: `none`
+> - Generate PixVerse audio: `no`
 > - Base image model: `gemini-3.1-flash` (ask only if an override is needed)
 > - Base image quality: `1080p`
 >
@@ -98,7 +99,7 @@ For story-mode, also extract:
 - `generation.referenceModel`
 - `generation.quality`
 - `generation.upscale`
-- `generation.ambientSound`
+- `generation.generateAudio`
 - `generation.image.model` when the user wants a non-default PixVerse image model
 - `generation.image.quality`
 - `generation.prompt.base`

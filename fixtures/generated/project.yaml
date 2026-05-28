@@ -63,7 +63,7 @@ generation:
   model: v6
   quality: 720p
   upscale: true
-  ambientSound: null
+  generateAudio: false
   image:
     enabled: true
     model: gemini-3.1-flash

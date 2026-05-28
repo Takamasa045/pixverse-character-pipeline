@@ -12,6 +12,7 @@ test("planner counts base, speech and upscale jobs for mixed generated config", 
   assert.equal(plan.imageJobs.length, 2);
   assert.equal(plan.totals.baseJobs, 2);
   assert.equal(plan.totals.imageJobs, 2);
+  assert.equal(plan.totals.audioJobs, 0);
   assert.equal(plan.totals.speechJobs, 4);
   assert.equal(plan.totals.soundJobs, 0);
   assert.equal(plan.totals.upscaleJobs, 4);
@@ -27,6 +28,7 @@ test("planner counts per-cut reference jobs separately from shared base jobs", a
   assert.equal(plan.totals.variants, 1);
   assert.equal(plan.totals.baseJobs, 0);
   assert.equal(plan.totals.referenceJobs, 2);
+  assert.equal(plan.totals.audioJobs, 0);
   assert.equal(plan.totals.speechJobs, 1);
   assert.equal(plan.totals.totalJobs, 3);
   assert.equal(plan.variants[0]?.referenceClipCount, 2);
@@ -42,6 +44,7 @@ test("planner does not count speech jobs for silent generated clips", async () =
   assert.equal(plan.totals.variants, 1);
   assert.equal(plan.totals.baseJobs, 1);
   assert.equal(plan.totals.imageJobs, 1);
+  assert.equal(plan.totals.audioJobs, 0);
   assert.equal(plan.totals.speechJobs, 0);
   assert.equal(plan.totals.totalJobs, 2);
 });

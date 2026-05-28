@@ -85,7 +85,10 @@ export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
         loaded.config.render.aspectRatios.length,
     0,
   );
-  const soundJobs = loaded.config.generation.ambientSound ? mediaProcessingJobs : 0;
+  const audioJobs = loaded.config.generation.generateAudio
+    ? baseJobs.length + referenceJobs.length
+    : 0;
+  const soundJobs = 0;
   const upscaleJobs = loaded.config.generation.upscale ? mediaProcessingJobs : 0;
 
   return {
@@ -97,6 +100,7 @@ export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
       baseJobs: baseJobs.length,
       generatedClipVariants,
       imageJobs: imageJobs.length,
+      audioJobs,
       referenceJobs: referenceJobs.length,
       soundJobs,
       speechJobs,

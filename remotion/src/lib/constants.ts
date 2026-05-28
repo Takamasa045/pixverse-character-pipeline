@@ -10,7 +10,7 @@ export const DEFAULT_ASPECT_RATIOS: SupportedAspectRatio[] = ["16:9", "9:16"];
 export const DEFAULT_FPS = 30;
 export const DEFAULT_OUTPUT_DIR = "./output";
 export const DEFAULT_GENERATION = {
-  ambientSound: null,
+  generateAudio: false,
   image: {
     enabled: true,
     model: "gemini-3.1-flash",
@@ -24,7 +24,7 @@ export const DEFAULT_GENERATION = {
     base: "A talking character derived from the provided character image, speaking directly to camera with subtle head movements and natural blinking, placed in a photoreal live-action environment with realistic depth, clean composition, and polished cinematic lighting",
   },
   quality: "720p",
-  referenceModel: "pixverse-c1",
+  referenceModel: "v6",
   upscale: true,
 };
 

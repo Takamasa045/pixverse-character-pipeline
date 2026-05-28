@@ -39,7 +39,8 @@ test("pipeline validate and plan succeed for fixture config", async () => {
 
   assert.equal(validatePayload.ok, true);
   assert.equal(validatePayload.generation.model, "v6");
-  assert.equal(validatePayload.generation.referenceModel, "pixverse-c1");
+  assert.equal(validatePayload.generation.referenceModel, "v6");
+  assert.equal(validatePayload.generation.generateAudio, false);
   assert.equal(validatePayload.generation.image.enabled, true);
   assert.equal(validatePayload.generation.image.model, "gemini-3.1-flash");
   assert.equal(planPayload.ok, true);

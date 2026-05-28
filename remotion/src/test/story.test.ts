@@ -55,7 +55,8 @@ test("buildStoryProjectConfig creates reference clips for each beat", () => {
   assert.equal(config.locales.ja.clips[0]?.text, "A seal begins to crack.");
   assert.equal(config.locales.ja.clips[1]?.source, "reference");
   assert.equal(config.locales.ja.clips[1]?.text, undefined);
-  assert.equal(config.generation.referenceModel, "pixverse-c1");
+  assert.equal(config.generation.referenceModel, "v6");
+  assert.equal(config.generation.generateAudio, false);
 });
 
 test("story command writes a reference-story config from interactive answers", async (t) => {
@@ -126,12 +127,13 @@ test("story command writes a reference-story config from interactive answers", a
   assert.match(stdout, /Character image path\(s\)/);
 
   const parsed = YAML.parse(await readFile(configPath, "utf8")) as {
-    generation: { referenceModel: string };
+    generation: { generateAudio: boolean; referenceModel: string };
     locales: Record<string, { clips: Array<{ prompt: string; source: string }> }>;
     project: { title: string };
   };
 
-  assert.equal(parsed.generation.referenceModel, "pixverse-c1");
+  assert.equal(parsed.generation.referenceModel, "v6");
+  assert.equal(parsed.generation.generateAudio, false);
   assert.equal(parsed.project.title, "Wizard Interactive Story");
   assert.equal(parsed.locales.ja.clips.length, 3);
   assert.equal(parsed.locales.ja.clips[0]?.source, "reference");

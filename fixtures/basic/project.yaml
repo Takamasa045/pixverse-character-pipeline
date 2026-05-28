@@ -39,6 +39,6 @@ generation:
   model: v6
   quality: 720p
   upscale: false
-  ambientSound: null
+  generateAudio: false
   prompt:
     base: A professional talking character speaking directly to camera

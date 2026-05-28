@@ -17,7 +17,14 @@ pnpm install
 pixverse auth login
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.6`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.10`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
+
+## Request Router
+
+- Announcement / multilingual batch: use `source: generated` clips and the shared I2I -> I2V flow.
+- Story / teaser / trailer / multi-cut: draft 3-5 beats and use `source: reference` per cut.
+- Existing local assets only: use `source: video` / `source: image` and `render`.
+- Legacy config: load `spokesperson.yaml`, normalize it, then use the standard workflow.
 
 ## Standard Workflow
 
@@ -30,8 +37,14 @@ pixverse auth login
 ## Clip Modes
 
 - `generated`: shared I2V pipeline. Can use PixVerse TTS, `audioFile`, or be silent.
-- `reference`: per-cut PixVerse reference generation for story / teaser / trailer workflows. Uses `generation.referenceModel` (`pixverse-c1` by default), not the shared `generation.model`.
+- `reference`: per-cut PixVerse reference generation for story / teaser / trailer workflows. Uses `generation.referenceModel` (`v6` by default; `pixverse-c1` is still a valid override).
 - `video` / `image`: local assets only.
+
+## Credit Boundary
+
+- Safe to run before approval: `validate`, `plan`, `run --dry-run`, and local-only `render`.
+- Requires explicit user approval: `run` without `--dry-run`, because it can submit PixVerse jobs and consume credits.
+- Before batch generation, report planned variants, image/base/reference/speech/upscale job counts, and any obvious credit or slot risk.
 
 ## Recommended Sub-Agent Split
 
@@ -50,6 +63,16 @@ pixverse auth login
 - Only one agent runs the final PixVerse mutation step for a given config or `run-id`.
 - Parallel workers should stay read-only or dry-run-only unless the coordinator explicitly hands off ownership.
 - Do not assume ElevenLabs. Speech comes from PixVerse `create speech` or from `audioFile`.
+
+## Final Report Template
+
+When a run or dry-run finishes, report:
+
+- Config path and run-id
+- Variant count and job counts
+- Output root and final MP4 paths, when rendered
+- `manifest.json` path
+- Any failed/skipped variant and exact error string
 
 ## Tool Notes
 

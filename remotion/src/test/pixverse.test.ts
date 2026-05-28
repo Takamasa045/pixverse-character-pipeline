@@ -31,8 +31,9 @@ test("PixVerse video arg builders use the correct model per mode", async () => {
   );
 
   assert.equal(generated.config.generation.model, "v6");
-  assert.equal(generated.config.generation.referenceModel, "pixverse-c1");
+  assert.equal(generated.config.generation.referenceModel, "v6");
   assert.equal(valueAfter(generatedArgs, "--model"), "v6");
+  assert.equal(generatedArgs.includes("--no-audio"), true);
 
   const reference = await loadProjectConfig(
     resolve(process.cwd(), "../fixtures/reference-story/project.yaml"),
@@ -48,7 +49,8 @@ test("PixVerse video arg builders use the correct model per mode", async () => {
     clip: referenceClip,
     config: reference.config,
   });
-  assert.equal(valueAfter(referenceArgs, "--model"), "pixverse-c1");
+  assert.equal(valueAfter(referenceArgs, "--model"), "v6");
+  assert.equal(referenceArgs.includes("--no-audio"), true);
 
   const sharedReferenceArgs = buildCreateBaseVideoArgs(
     {
@@ -64,5 +66,6 @@ test("PixVerse video arg builders use the correct model per mode", async () => {
     },
     "9:16",
   );
-  assert.equal(valueAfter(sharedReferenceArgs, "--model"), "pixverse-c1");
+  assert.equal(valueAfter(sharedReferenceArgs, "--model"), "v6");
+  assert.equal(sharedReferenceArgs.includes("--no-audio"), true);
 });

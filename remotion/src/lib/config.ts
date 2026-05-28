@@ -47,6 +47,21 @@ const asUnitVolume = (value: unknown): number | undefined => {
 const asBoolean = (value: unknown): boolean | undefined =>
   typeof value === "boolean" ? value : undefined;
 
+const normalizeGenerateAudio = (value: unknown, legacyAmbientSound: unknown): boolean => {
+  const explicit = asBoolean(value);
+
+  if (explicit !== undefined) {
+    return explicit;
+  }
+
+  const legacy = asString(legacyAmbientSound)?.toLowerCase();
+  if (legacy && legacy !== "none" && legacy !== "null" && legacy !== "false") {
+    return true;
+  }
+
+  return DEFAULT_GENERATION.generateAudio;
+};
+
 const asOverlayStyle = (value: unknown): OverlayStyle => {
   const normalized = asString(value);
   const allowed: OverlayStyle[] = ["title", "subtitle", "lower-third", "endcard", "none"];
@@ -255,7 +270,10 @@ const normalizeProjectConfig = (raw: Record<string, unknown>, configDir: string)
 
   return {
     generation: {
-      ambientSound: asString(generationRaw.ambientSound) ?? DEFAULT_GENERATION.ambientSound,
+      generateAudio: normalizeGenerateAudio(
+        generationRaw.generateAudio,
+        generationRaw.ambientSound,
+      ),
       image: {
         enabled: imageEnabled,
         model: asString(imageGenerationRaw.model) ?? DEFAULT_GENERATION.image.model,
@@ -347,7 +365,7 @@ const normalizeLegacyConfig = (raw: Record<string, unknown>, configDir: string):
 
   return {
     generation: {
-      ambientSound: asString(outputRaw.ambient_sound) ?? DEFAULT_GENERATION.ambientSound,
+      generateAudio: normalizeGenerateAudio(outputRaw.generate_audio, outputRaw.ambient_sound),
       image: {
         enabled: DEFAULT_GENERATION.image.enabled,
         model: DEFAULT_GENERATION.image.model,
@@ -492,6 +510,7 @@ export const loadProjectConfig = async (configPath: string): Promise<LoadedConfi
 export const describeConfigForCli = (loaded: LoadedConfig) => ({
   aspectRatios: loaded.config.render.aspectRatios,
   generation: {
+    generateAudio: loaded.config.generation.generateAudio,
     image: {
       enabled: loaded.config.generation.image.enabled,
       model: loaded.config.generation.image.model,

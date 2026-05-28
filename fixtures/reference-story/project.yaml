@@ -38,9 +38,9 @@ render:
 
 generation:
   model: v6
-  referenceModel: pixverse-c1
+  referenceModel: v6
   quality: 720p
   upscale: false
-  ambientSound: null
+  generateAudio: false
   prompt:
     base: Reference story fixture prompt

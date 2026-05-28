@@ -96,6 +96,9 @@ const maxGeneratedDuration = (config: ProjectConfig): number =>
 const resolvePrompt = (prompt: PromptConfig, aspectRatio: SupportedAspectRatio): string =>
   prompt.perRatio?.[aspectRatio] ?? prompt.base;
 
+const audioFlag = (config: ProjectConfig): string =>
+  config.generation.generateAudio ? "--audio" : "--no-audio";
+
 const findDownloadedAsset = async (
   destinationDirectory: string,
   extensions?: string[],
@@ -188,6 +191,7 @@ export const buildCreateBaseVideoArgs = (
       duration,
       "--aspect-ratio",
       aspectRatio,
+      audioFlag(config),
       "--no-wait",
     ];
   }
@@ -208,6 +212,7 @@ export const buildCreateBaseVideoArgs = (
       duration,
       "--aspect-ratio",
       aspectRatio,
+      audioFlag(config),
       "--no-wait",
     ];
   }
@@ -227,6 +232,7 @@ export const buildCreateBaseVideoArgs = (
     duration,
     "--aspect-ratio",
     aspectRatio,
+    audioFlag(config),
     "--no-wait",
   ];
 };
@@ -265,6 +271,7 @@ export const buildCreateReferenceVideoArgs = ({
   String(Math.max(1, Math.round(clip.durationSeconds))),
   "--aspect-ratio",
   aspectRatio,
+  audioFlag(config),
   "--no-wait",
 ];
 
@@ -307,21 +314,6 @@ export const createSpeech = async (
   args.push("--no-wait");
 
   const payload = await runPixverse(args);
-  return extractTaskId(payload);
-};
-
-export const createSound = async (videoId: string, prompt: string): Promise<string> => {
-  const payload = await runPixverse([
-    "create",
-    "sound",
-    "--video",
-    videoId,
-    "--prompt",
-    prompt,
-    "--keep-original-sound",
-    "--no-wait",
-  ]);
-
   return extractTaskId(payload);
 };
 

@@ -23,7 +23,7 @@ This repository packages PixVerse CLI into a reusable multilingual character-vid
 - Character-image-to-live-action-scene workflow powered by PixVerse prompts
 - Neutral config model: `project.yaml`
 - Backward compatibility with legacy `spokesperson.yaml`
-- Mixed clip model: `generated | video | image`
+- Mixed clip model: `generated | reference | video | image`
 - Batch execution across locales and aspect ratios
 - Deterministic manifests and output layout for downstream automation
 - Local smoke-test path that does not require PixVerse credits
@@ -48,7 +48,7 @@ pnpm test
 - `pixverse create reference --images`
 - `pixverse create speech --tts-text`
 - `pixverse create speech --audio`
-- `pixverse create sound --prompt`
+- `pixverse create video --audio` / `--no-audio`
 - `pixverse create upscale --quality`
 - `pixverse task wait <id> --json`
 - `pixverse asset download <id> --dest <dir> --json`
@@ -66,7 +66,7 @@ Highlights:
 - agent-friendly commands: validate / plan / run / render
 - character-image-to-live-action-scene generation as the main creative use case
 - neutral YAML schema with legacy config compatibility
-- support for mixed generated, video, and image clips
+- support for mixed generated, reference, video, and image clips
 - multi-locale and multi-aspect-ratio batch execution
 - deterministic manifests and output structure for automation
 - local smoke-test path and dry-run support
