@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { loadProjectConfig } from "../lib/config";
 import {
+  buildCreateBaseImageArgs,
   buildCreateBaseVideoArgs,
+  buildCreateSpeechArgs,
+  buildIdempotencyKey,
   buildCreateReferenceVideoArgs,
+  buildCreateUpscaleArgs,
   parseJsonOutput,
 } from "../lib/pixverse";
 
@@ -68,4 +72,49 @@ test("PixVerse video arg builders use the correct model per mode", async () => {
   );
   assert.equal(valueAfter(sharedReferenceArgs, "--model"), "v6");
   assert.equal(sharedReferenceArgs.includes("--no-audio"), true);
+});
+
+test("PixVerse create arg builders add stable idempotency keys when scoped", async () => {
+  const generated = await loadProjectConfig(
+    resolve(process.cwd(), "../fixtures/generated/project.yaml"),
+  );
+  const scope = "mixed-generated:retry-safe:16x9:base-video";
+  const baseVideoArgs = buildCreateBaseVideoArgs(
+    generated.config,
+    "16:9",
+    "/tmp/base-image.png",
+    { idempotencyScope: scope },
+  );
+  const withoutKey = buildCreateBaseVideoArgs(
+    generated.config,
+    "16:9",
+    "/tmp/base-image.png",
+  );
+  const expectedKey = buildIdempotencyKey(
+    scope,
+    withoutKey,
+  );
+
+  assert.equal(valueAfter(baseVideoArgs, "--idempotency-key"), expectedKey);
+  assert.equal(withoutKey.includes("--idempotency-key"), false);
+
+  const baseImageArgs = buildCreateBaseImageArgs(generated.config, "16:9", {
+    idempotencyScope: "mixed-generated:retry-safe:16x9:base-image",
+  });
+  assert.equal(baseImageArgs.includes("--idempotency-key"), true);
+
+  const firstClip = generated.config.locales.en.clips[0];
+  if (!firstClip || firstClip.source !== "generated") {
+    throw new Error("generated fixture did not load a generated clip.");
+  }
+
+  const speechArgs = buildCreateSpeechArgs("video-123", firstClip, {
+    idempotencyScope: "mixed-generated:retry-safe:en:16x9:intro:speech",
+  });
+  assert.equal(speechArgs.includes("--idempotency-key"), true);
+
+  const upscaleArgs = buildCreateUpscaleArgs("video-123", "720p", {
+    idempotencyScope: "mixed-generated:retry-safe:en:16x9:intro:upscale",
+  });
+  assert.equal(upscaleArgs.includes("--idempotency-key"), true);
 });

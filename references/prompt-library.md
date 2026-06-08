@@ -59,7 +59,7 @@ A talking character derived from the provided character image, speaking directly
 
 ### Phase 3 / Mode C: Per-Cut Reference Prompt
 
-ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。PixVerse CLI 1.1.10 では `create reference` も `v6` 対応なので、既定は `generation.referenceModel: v6`。C1 寄りの reference 表現が必要な場合だけ `pixverse-c1` に上書きする。
+ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。PixVerse CLI 1.1.12 では `create reference` も `v6` 対応なので、既定は `generation.referenceModel: v6`。C1 寄りの reference 表現が必要な場合だけ `pixverse-c1` に上書きする。
 
 テンプレート:
 ```

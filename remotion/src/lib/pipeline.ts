@@ -119,13 +119,39 @@ const isSelectedVariant = (
 const clipNeedsSpeech = (clip: GeneratedClipConfig | ReferenceClipConfig): boolean =>
   Boolean(clip.text || clip.audioFile);
 
+const idempotencyScope = ({
+  aspectRatio,
+  clipId = "base",
+  language = "shared",
+  projectSlug,
+  runId,
+  stage,
+}: {
+  aspectRatio: SupportedAspectRatio;
+  clipId?: string;
+  language?: string;
+  projectSlug: string;
+  runId: string;
+  stage: string;
+}): string =>
+  [
+    projectSlug,
+    runId,
+    language,
+    ratioToSlug(aspectRatio),
+    clipId,
+    stage,
+  ].join(":");
+
 const prepareGeneratedClip = async ({
   aspectRatio,
   baseVideoId,
   clip,
   config,
   dryRun,
+  language,
   outputAssetsDir,
+  runId,
   stageAssetsDir,
 }: {
   aspectRatio: SupportedAspectRatio;
@@ -133,7 +159,9 @@ const prepareGeneratedClip = async ({
   clip: GeneratedClipConfig;
   config: LoadedConfig["config"];
   dryRun: boolean;
+  language: string;
   outputAssetsDir: string;
+  runId: string;
   stageAssetsDir: string;
 }): Promise<{ outputPath: string; publicPath: string; stageIds: ClipStageIds }> => {
   const targetName = clipTargetName(clip.id, null, ".mp4");
@@ -152,13 +180,31 @@ const prepareGeneratedClip = async ({
   let upscaleId: string | null = null;
 
   if (clipNeedsSpeech(clip)) {
-    speechId = await createSpeech(baseVideoId, clip);
+    speechId = await createSpeech(baseVideoId, clip, {
+      idempotencyScope: idempotencyScope({
+        aspectRatio,
+        clipId: clip.id,
+        language,
+        projectSlug: config.project.slug,
+        runId,
+        stage: "speech",
+      }),
+    });
     await waitForTask(speechId);
     latestId = speechId;
   }
 
   if (config.generation.upscale) {
-    upscaleId = await createUpscale(latestId, config.generation.quality);
+    upscaleId = await createUpscale(latestId, config.generation.quality, {
+      idempotencyScope: idempotencyScope({
+        aspectRatio,
+        clipId: clip.id,
+        language,
+        projectSlug: config.project.slug,
+        runId,
+        stage: "upscale",
+      }),
+    });
     await waitForTask(upscaleId);
     latestId = upscaleId;
   }
@@ -196,14 +242,18 @@ const prepareReferenceClip = async ({
   clip,
   config,
   dryRun,
+  language,
   outputAssetsDir,
+  runId,
   stageAssetsDir,
 }: {
   aspectRatio: SupportedAspectRatio;
   clip: ReferenceClipConfig;
   config: LoadedConfig["config"];
   dryRun: boolean;
+  language: string;
   outputAssetsDir: string;
+  runId: string;
   stageAssetsDir: string;
 }): Promise<{ outputPath: string; publicPath: string; stageIds: ClipStageIds }> => {
   const targetName = clipTargetName(clip.id, null, ".mp4");
@@ -217,7 +267,19 @@ const prepareReferenceClip = async ({
     };
   }
 
-  const baseVideoId = await createReferenceVideo({ aspectRatio, clip, config });
+  const baseVideoId = await createReferenceVideo({
+    aspectRatio,
+    clip,
+    config,
+    idempotencyScope: idempotencyScope({
+      aspectRatio,
+      clipId: clip.id,
+      language,
+      projectSlug: config.project.slug,
+      runId,
+      stage: "reference-video",
+    }),
+  });
   await waitForTask(baseVideoId);
 
   let latestId = baseVideoId;
@@ -225,13 +287,31 @@ const prepareReferenceClip = async ({
   let upscaleId: string | null = null;
 
   if (clipNeedsSpeech(clip)) {
-    speechId = await createSpeech(latestId, clip);
+    speechId = await createSpeech(latestId, clip, {
+      idempotencyScope: idempotencyScope({
+        aspectRatio,
+        clipId: clip.id,
+        language,
+        projectSlug: config.project.slug,
+        runId,
+        stage: "speech",
+      }),
+    });
     await waitForTask(speechId);
     latestId = speechId;
   }
 
   if (config.generation.upscale) {
-    upscaleId = await createUpscale(latestId, config.generation.quality);
+    upscaleId = await createUpscale(latestId, config.generation.quality, {
+      idempotencyScope: idempotencyScope({
+        aspectRatio,
+        clipId: clip.id,
+        language,
+        projectSlug: config.project.slug,
+        runId,
+        stage: "upscale",
+      }),
+    });
     await waitForTask(upscaleId);
     latestId = upscaleId;
   }
@@ -273,6 +353,7 @@ const executeVariant = async ({
   dryRun,
   language,
   locale,
+  runId,
   runRoot,
   stageRoot,
 }: {
@@ -284,6 +365,7 @@ const executeVariant = async ({
   dryRun: boolean;
   language: string;
   locale: LoadedConfig["config"]["locales"][string];
+  runId: string;
   runRoot: string;
   stageRoot: string;
 }): Promise<RunVariantManifest> => {
@@ -335,7 +417,9 @@ const executeVariant = async ({
         clip,
         config: config.config,
         dryRun,
+        language,
         outputAssetsDir,
+        runId,
         stageAssetsDir,
       });
 
@@ -351,7 +435,9 @@ const executeVariant = async ({
         clip,
         config: config.config,
         dryRun,
+        language,
         outputAssetsDir,
+        runId,
         stageAssetsDir,
       });
 
@@ -480,7 +566,14 @@ export const executePipeline = async (
       let baseImagePath: string | undefined;
 
       if (loaded.config.generation.image.enabled) {
-        const baseImageId = await createBaseImage(loaded.config, aspectRatio);
+        const baseImageId = await createBaseImage(loaded.config, aspectRatio, {
+          idempotencyScope: idempotencyScope({
+            aspectRatio,
+            projectSlug: loaded.config.project.slug,
+            runId,
+            stage: "base-image",
+          }),
+        });
         await waitForTask(baseImageId, "image");
         baseImageIds.set(aspectRatio, baseImageId);
 
@@ -506,7 +599,14 @@ export const executePipeline = async (
         baseImagePath = storedBaseImage;
       }
 
-      const baseVideoId = await createBaseVideo(loaded.config, aspectRatio, baseImagePath);
+      const baseVideoId = await createBaseVideo(loaded.config, aspectRatio, baseImagePath, {
+        idempotencyScope: idempotencyScope({
+          aspectRatio,
+          projectSlug: loaded.config.project.slug,
+          runId,
+          stage: "base-video",
+        }),
+      });
       await waitForTask(baseVideoId);
       baseVideoIds.set(aspectRatio, baseVideoId);
     }
@@ -527,6 +627,7 @@ export const executePipeline = async (
         dryRun: options.dryRun ?? false,
         language: variant.language,
         locale,
+        runId,
         runRoot,
         stageRoot,
       });

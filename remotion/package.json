@@ -25,7 +25,7 @@
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "pixverse": "^1.1.10",
+    "pixverse": "^1.1.12",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

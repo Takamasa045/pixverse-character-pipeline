@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { extname, resolve } from "node:path";
@@ -12,6 +13,9 @@ import type {
 } from "./types";
 
 type PixverseAssetType = "image" | "video";
+type PixverseCreateOptions = {
+  idempotencyScope?: string;
+};
 
 const localPixverseBinary = resolve(
   remotionRoot,
@@ -72,6 +76,28 @@ const runPixverse = async (args: string[]): Promise<Record<string, unknown>> => 
   return parseJsonOutput(stdout);
 };
 
+export const buildIdempotencyKey = (scope: string, args: string[]): string => {
+  const digest = createHash("sha256")
+    .update(JSON.stringify({ args, scope }))
+    .digest("hex")
+    .slice(0, 48);
+
+  return `pvc-${digest}`;
+};
+
+const withIdempotencyKey = (
+  args: string[],
+  options?: PixverseCreateOptions,
+): string[] => {
+  const scope = options?.idempotencyScope?.trim();
+
+  if (!scope) {
+    return args;
+  }
+
+  return [...args, "--idempotency-key", buildIdempotencyKey(scope, args)];
+};
+
 export const getAvailableCredits = async (): Promise<number> => {
   const payload = await runPixverse(["account", "info"]);
   const credits = payload.credits;
@@ -127,56 +153,65 @@ const findDownloadedAsset = async (
 export const createBaseImage = async (
   config: ProjectConfig,
   aspectRatio: SupportedAspectRatio,
+  options?: PixverseCreateOptions,
 ): Promise<string> => {
+  const payload = await runPixverse(buildCreateBaseImageArgs(config, aspectRatio, options));
+  return extractTaskId(payload);
+};
+
+export const buildCreateBaseImageArgs = (
+  config: ProjectConfig,
+  aspectRatio: SupportedAspectRatio,
+  options?: PixverseCreateOptions,
+): string[] => {
   const prompt = resolvePrompt(config.generation.image.prompt, aspectRatio);
   const useMultipleImages = config.speaker.images.length > 1;
-  const args =
-    useMultipleImages
-      ? [
-          "create",
-          "image",
-          "--images",
-          ...config.speaker.images,
-          "--prompt",
-          prompt,
-          "--model",
-          config.generation.image.model,
-          "--quality",
-          config.generation.image.quality,
-          "--aspect-ratio",
-          aspectRatio,
-          "--no-wait",
-        ]
-      : [
-          "create",
-          "image",
-          "--image",
-          config.speaker.images[0],
-          "--prompt",
-          prompt,
-          "--model",
-          config.generation.image.model,
-          "--quality",
-          config.generation.image.quality,
-          "--aspect-ratio",
-          aspectRatio,
-          "--no-wait",
-        ];
+  const args = useMultipleImages
+    ? [
+        "create",
+        "image",
+        "--images",
+        ...config.speaker.images,
+        "--prompt",
+        prompt,
+        "--model",
+        config.generation.image.model,
+        "--quality",
+        config.generation.image.quality,
+        "--aspect-ratio",
+        aspectRatio,
+        "--no-wait",
+      ]
+    : [
+        "create",
+        "image",
+        "--image",
+        config.speaker.images[0],
+        "--prompt",
+        prompt,
+        "--model",
+        config.generation.image.model,
+        "--quality",
+        config.generation.image.quality,
+        "--aspect-ratio",
+        aspectRatio,
+        "--no-wait",
+      ];
 
-  const payload = await runPixverse(args);
-  return extractTaskId(payload);
+  return withIdempotencyKey(args, options);
 };
 
 export const buildCreateBaseVideoArgs = (
   config: ProjectConfig,
   aspectRatio: SupportedAspectRatio,
   sourceImagePath?: string,
+  options?: PixverseCreateOptions,
 ): string[] => {
   const prompt = resolvePrompt(config.generation.prompt, aspectRatio);
   const duration = String(maxGeneratedDuration(config));
 
   if (sourceImagePath) {
-    return [
+    return withIdempotencyKey([
       "create",
       "video",
       "--image",
@@ -193,11 +228,11 @@ export const buildCreateBaseVideoArgs = (
       aspectRatio,
       audioFlag(config),
       "--no-wait",
-    ];
+    ], options);
   }
 
   if (config.speaker.mode === "reference") {
-    return [
+    return withIdempotencyKey([
       "create",
       "reference",
       "--images",
@@ -214,10 +249,10 @@ export const buildCreateBaseVideoArgs = (
       aspectRatio,
       audioFlag(config),
       "--no-wait",
-    ];
+    ], options);
   }
 
-  return [
+  return withIdempotencyKey([
     "create",
     "video",
     "--image",
@@ -234,16 +269,17 @@ export const buildCreateBaseVideoArgs = (
     aspectRatio,
     audioFlag(config),
     "--no-wait",
-  ];
+  ], options);
 };
 
 export const createBaseVideo = async (
   config: ProjectConfig,
   aspectRatio: SupportedAspectRatio,
   sourceImagePath?: string,
+  options?: PixverseCreateOptions,
 ): Promise<string> => {
   const payload = await runPixverse(
-    buildCreateBaseVideoArgs(config, aspectRatio, sourceImagePath),
+    buildCreateBaseVideoArgs(config, aspectRatio, sourceImagePath, options),
   );
   return extractTaskId(payload);
 };
@@ -252,40 +288,48 @@ export const buildCreateReferenceVideoArgs = ({
   aspectRatio,
   clip,
   config,
+  idempotencyScope,
 }: {
   aspectRatio: SupportedAspectRatio;
   clip: ReferenceClipConfig;
   config: ProjectConfig;
-}): string[] => [
-  "create",
-  "reference",
-  "--images",
-  ...config.speaker.images,
-  "--prompt",
-  clip.prompt,
-  "--model",
-  config.generation.referenceModel,
-  "--quality",
-  config.generation.quality,
-  "--duration",
-  String(Math.max(1, Math.round(clip.durationSeconds))),
-  "--aspect-ratio",
-  aspectRatio,
-  audioFlag(config),
-  "--no-wait",
-];
+  idempotencyScope?: string;
+}): string[] =>
+  withIdempotencyKey(
+    [
+      "create",
+      "reference",
+      "--images",
+      ...config.speaker.images,
+      "--prompt",
+      clip.prompt,
+      "--model",
+      config.generation.referenceModel,
+      "--quality",
+      config.generation.quality,
+      "--duration",
+      String(Math.max(1, Math.round(clip.durationSeconds))),
+      "--aspect-ratio",
+      aspectRatio,
+      audioFlag(config),
+      "--no-wait",
+    ],
+    { idempotencyScope },
+  );
 
 export const createReferenceVideo = async ({
   aspectRatio,
   clip,
   config,
+  idempotencyScope,
 }: {
   aspectRatio: SupportedAspectRatio;
   clip: ReferenceClipConfig;
   config: ProjectConfig;
+  idempotencyScope?: string;
 }): Promise<string> => {
   const payload = await runPixverse(
-    buildCreateReferenceVideoArgs({ aspectRatio, clip, config }),
+    buildCreateReferenceVideoArgs({ aspectRatio, clip, config, idempotencyScope }),
   );
   return extractTaskId(payload);
 };
@@ -300,7 +344,17 @@ export const waitForTask = async (
 export const createSpeech = async (
   baseVideoId: string,
   clip: GeneratedClipConfig | ReferenceClipConfig,
+  options?: PixverseCreateOptions,
 ): Promise<string> => {
+  const payload = await runPixverse(buildCreateSpeechArgs(baseVideoId, clip, options));
+  return extractTaskId(payload);
+};
+
+export const buildCreateSpeechArgs = (
+  baseVideoId: string,
+  clip: GeneratedClipConfig | ReferenceClipConfig,
+  options?: PixverseCreateOptions,
+): string[] => {
   const args = ["create", "speech", "--video", baseVideoId];
 
   if (clip.audioFile) {
@@ -313,23 +367,36 @@ export const createSpeech = async (
 
   args.push("--no-wait");
 
-  const payload = await runPixverse(args);
-  return extractTaskId(payload);
+  return withIdempotencyKey(args, options);
 };
 
-export const createUpscale = async (videoId: string, quality: string): Promise<string> => {
-  const payload = await runPixverse([
-    "create",
-    "upscale",
-    "--video",
-    videoId,
-    "--quality",
-    quality,
-    "--no-wait",
-  ]);
+export const createUpscale = async (
+  videoId: string,
+  quality: string,
+  options?: PixverseCreateOptions,
+): Promise<string> => {
+  const payload = await runPixverse(buildCreateUpscaleArgs(videoId, quality, options));
 
   return extractTaskId(payload);
 };
+
+export const buildCreateUpscaleArgs = (
+  videoId: string,
+  quality: string,
+  options?: PixverseCreateOptions,
+): string[] =>
+  withIdempotencyKey(
+    [
+      "create",
+      "upscale",
+      "--video",
+      videoId,
+      "--quality",
+      quality,
+      "--no-wait",
+    ],
+    options,
+  );
 
 export const downloadAsset = async (
   assetId: string,

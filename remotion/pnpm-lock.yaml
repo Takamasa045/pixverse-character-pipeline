@@ -37,8 +37,8 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.14)
       pixverse:
-        specifier: ^1.1.10
-        version: 1.1.10
+        specifier: ^1.1.12
+        version: 1.1.12
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -65,12 +65,12 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@clack/core@1.3.0':
-    resolution: {integrity: sha512-xJPHpAmEQUBrXSLx0gF+q5K/IyihXpsHZcha+jB+tyahsKRK3Dxo4D0coZDewHo12NhiuzC3dTtMPbm53GEAAA==}
+  '@clack/core@1.4.1':
+    resolution: {integrity: sha512-FILJa1gGKEFTGZAJE9RpVhrjKz3c3h4ar60dSv6cGuDqufQ84YEIS3GAGvZiN+H6yaLbbvTFNejjCC4tXpZEuw==}
     engines: {node: '>= 20.12.0'}
 
-  '@clack/prompts@1.3.0':
-    resolution: {integrity: sha512-GgcWwRCs/xPtaqlMy8qRhPnZf9vlWcWZNHAitnVQ3yk7JmSralSiq5q07yaffYE8SogtDm7zFeKccx1QNVARpw==}
+  '@clack/prompts@1.5.1':
+    resolution: {integrity: sha512-zccHj2z2oCCO4yrDiRSlFOxWerGqRiysP7a5jPK6uoI9URKAquwY42Dd/iUP8JWHxEzdRe4TlbvZCo8z1/mhrw==}
     engines: {node: '>= 20.12.0'}
 
   '@emnapi/runtime@1.10.0':
@@ -1323,8 +1323,8 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  pixverse@1.1.10:
-    resolution: {integrity: sha512-AtmCZbDTlfydCgkct1bFfm0XjDPI+6fmDP4gn77ayA/sAij7oE6Krf61V8FWYOMtBtmhtItFiT3d1hi17+t+ZA==}
+  pixverse@1.1.12:
+    resolution: {integrity: sha512-En4HUSNdF2k73jCktKeyGRGeMKXNVl1jIHlu3EsdbVQM0VujQSj2YZJwA9jtm7bDTuP/l+k32SmwLJu9K1Jk1w==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -1740,14 +1740,14 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@clack/core@1.3.0':
+  '@clack/core@1.4.1':
     dependencies:
       fast-wrap-ansi: 0.2.0
       sisteransi: 1.0.5
 
-  '@clack/prompts@1.3.0':
+  '@clack/prompts@1.5.1':
     dependencies:
-      '@clack/core': 1.3.0
+      '@clack/core': 1.4.1
       fast-string-width: 3.0.2
       fast-wrap-ansi: 0.2.0
       sisteransi: 1.0.5
@@ -2901,9 +2901,9 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  pixverse@1.1.10:
+  pixverse@1.1.12:
     dependencies:
-      '@clack/prompts': 1.3.0
+      '@clack/prompts': 1.5.1
       ali-oss: 6.23.0
       commander: 14.0.3
       conf: 15.1.0

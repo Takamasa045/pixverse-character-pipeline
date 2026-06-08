@@ -3,11 +3,54 @@
 This repository is designed to work with both Codex and Claude Code.
 The runtime itself is tool-agnostic: all execution goes through `project.yaml` and `remotion/./bin/pipeline`.
 
+This file is also the operating entrypoint for AI agents working in this repo. Keep the PixVerse execution rules below intact, and use the project operating files to preserve context across sessions.
+
+This is a public OSS repository. Write operating notes as contributor-facing documentation, not private memory.
+
 ## First Things To Read
 
+- `VISION.md`
+- `CHECKS.md`
+- `LOOPS.md`
+- `DECISIONS.md`
+- `NEXT_ACTIONS.md`
 - `README.md` or `README.ja.md`
 - `SKILL.md`
 - `references/interactive-questions.md`
+
+Read only the sections needed for the request, but do not skip `CHECKS.md` before any command that can write output or spend credits.
+
+## Project Operating Loop
+
+Use this loop for non-trivial work:
+
+1. Understand the request and read the nearest source files.
+2. Check `VISION.md` for project intent and boundaries.
+3. Pick a loop from `LOOPS.md` when the task matches a repeated workflow.
+4. Make a short plan before editing or running commands.
+5. Use `CHECKS.md` before validation, dry-run, render, submission, or PixVerse generation.
+6. Record lasting decisions in `DECISIONS.md`.
+7. Record unresolved follow-ups in `NEXT_ACTIONS.md`.
+
+Do not turn every small task into heavy process. For a typo or a narrow docs fix, read the relevant file, patch it, and report the result.
+
+## Operating File Roles
+
+- `VISION.md`: project purpose, audience, values, scope, and success definition.
+- `CHECKS.md`: pre-flight, dry-run, render, public submission, and PixVerse credit checks.
+- `LOOPS.md`: repeatable workflows for announcement videos, reference stories, local render, CLI refresh, submission, content repurposing, and run review.
+- `DECISIONS.md`: append-only record of decisions that should survive the current session.
+- `NEXT_ACTIONS.md`: current backlog and blocked items for the next agent or human operator.
+
+Update these files only when the change is meant to affect future sessions. Keep temporary notes in the final response or ignored `output/` files.
+
+## Open Source Safety
+
+- Do not commit PixVerse account data, tokens, credit balances, private paths, or private client/event details.
+- Do not promote raw `output/` or `output/runs/` logs into tracked docs without summarizing and removing private context.
+- Keep `NEXT_ACTIONS.md` public-safe. Use GitHub Issues for external collaboration when an item becomes a real public task.
+- Keep content repurposing loops optional and generalized; this repo's core is the PixVerse character pipeline.
+- When in doubt, prefer generic examples and neutral fixtures.
 
 ## Required Local Setup
 
@@ -17,7 +60,7 @@ pnpm install
 pixverse auth login
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.10`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
 
 ## Request Router
 
@@ -45,6 +88,8 @@ pixverse auth login
 - Safe to run before approval: `validate`, `plan`, `run --dry-run`, and local-only `render`.
 - Requires explicit user approval: `run` without `--dry-run`, because it can submit PixVerse jobs and consume credits.
 - Before batch generation, report planned variants, image/base/reference/speech/upscale job counts, and any obvious credit or slot risk.
+- Full `run` passes deterministic PixVerse `--idempotency-key` values scoped by project/run-id/variant/stage to reduce duplicate credit spend on retries.
+- Never run PixVerse generation just to verify documentation changes.
 
 ## Recommended Sub-Agent Split
 
@@ -73,6 +118,13 @@ When a run or dry-run finishes, report:
 - Output root and final MP4 paths, when rendered
 - `manifest.json` path
 - Any failed/skipped variant and exact error string
+
+When documentation or operating files change, report:
+
+- Files changed
+- Whether PixVerse generation was avoided
+- Verification performed, or why it was not needed
+- Any follow-up added to `NEXT_ACTIONS.md`
 
 ## Tool Notes
 

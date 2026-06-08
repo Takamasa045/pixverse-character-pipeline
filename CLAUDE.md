@@ -17,7 +17,7 @@ pnpm install
 pixverse auth login
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.10`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
 
 ## Request Router
 
@@ -45,6 +45,7 @@ pixverse auth login
 - Safe to run before approval: `validate`, `plan`, `run --dry-run`, and local-only `render`.
 - Requires explicit user approval: `run` without `--dry-run`, because it can submit PixVerse jobs and consume credits.
 - Before batch generation, report planned variants, image/base/reference/speech/upscale job counts, and any obvious credit or slot risk.
+- Full `run` passes deterministic PixVerse `--idempotency-key` values scoped by project/run-id/variant/stage to reduce duplicate credit spend on retries.
 
 ## Recommended Sub-Agent Split
 

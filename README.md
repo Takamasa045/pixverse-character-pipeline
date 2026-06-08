@@ -83,7 +83,7 @@ Default behavior for attached character image(s):
 2. Keep `generation.model: v6`
 3. Use `generation.referenceModel: v6` for `source: reference` clips; set `pixverse-c1` only when you explicitly want C1-style cinematic reference behavior
 4. Keep `generation.image.enabled: true`
-5. Default this workflow's `generation.image.model` to `gemini-3.1-flash` and `generation.image.quality` to `1080p` (PixVerse CLI 1.1.10 also supports `qwen-image`, `gpt-image-2.0`, `gemini-3.0`, and Seedream/Kling image models)
+5. Default this workflow's `generation.image.model` to `gemini-3.1-flash` and `generation.image.quality` to `1080p` (PixVerse CLI 1.1.12 also supports `gpt-image-2.0`, `qwen-image`, `gemini-3.0`, and Seedream/Kling image models)
 6. Start from PixVerse I2I (`create image`) and then run I2V (`create video --image`)
 7. Do not switch to `source: reference` or `pixverse create reference` unless the user explicitly asks for a story / teaser / trailer / multi-cut workflow or provides multiple reference images
 
@@ -131,7 +131,7 @@ cd remotion
 pnpm install
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.10`). `./bin/pipeline` uses `PIXVERSE_BIN` when set, otherwise it prefers `remotion/node_modules/.bin/pixverse`, then falls back to `pixverse` on PATH.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). `./bin/pipeline` uses `PIXVERSE_BIN` when set, otherwise it prefers `remotion/node_modules/.bin/pixverse`, then falls back to `pixverse` on PATH.
 
 ## Main Commands
 
@@ -150,6 +150,8 @@ cd remotion
 - `run`: PixVerse generation → render manifests → final MP4s
 - `story`: interactively build a reference-story `project.yaml`, then optionally `dry-run` or `run`
 - `render`: render a single variant using only local clips
+
+Full `run` uses PixVerse `--idempotency-key` for create jobs. The key is derived from project slug, run-id, variant, stage, and command args, so retrying the same `--run-id` is less likely to spend credits twice while edited prompts/configs still create fresh jobs.
 
 `pnpm pipeline:*` is available as a convenience alias. Prefer `./bin/pipeline` when shell PATH resolution is unreliable.
 
@@ -215,7 +217,7 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name; this workflow defaults to `gemini-3.1-flash` at `1080p`, while PixVerse CLI 1.1.10 also supports current image models such as `qwen-image`, `gpt-image-2.0`, `gemini-3.0`, `seedream-5.0-lite`, and Kling image models. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
+PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name; this workflow defaults to `gemini-3.1-flash` at `1080p`, while PixVerse CLI 1.1.12 also supports current image models such as `gpt-image-2.0`, `qwen-image`, `gemini-3.0`, `seedream-5.0-lite`, and Kling image models. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
 
 `source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. They use `generation.referenceModel` (`v6` by default; `pixverse-c1` remains available as an override). `generateAudio: true` maps to PixVerse CLI `--audio`; the default `false` maps to `--no-audio`. The legacy `ambientSound` field is accepted as a compatibility alias, but the pipeline no longer calls the removed `create sound` command. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
 

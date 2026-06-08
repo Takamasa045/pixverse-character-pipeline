@@ -48,7 +48,7 @@ metadata:
 8. **構成設計は `short-video-editing` スキルに従う**
 9. **`story` / `teaser` / `trailer` / `multi-cut` 指示では Mode C を優先** — 共有ベース動画ではなく、各カットを個別に `pixverse create reference --images` で作る
 10. **Mode C では `source: reference` を優先** — pipeline runtime で各カットを直接 reference 生成できる。すでにローカル素材化済みなら `video` へ落としてよい
-11. **PixVerse CLI 1.1.10 では reference も `v6` 対応** — `generation.model` と `generation.referenceModel` の既定はどちらも `v6`。C1 寄りの reference 表現が必要なときだけ `pixverse-c1` に上書きする
+11. **PixVerse CLI 1.1.12 では reference も `v6` 対応** — `generation.model` と `generation.referenceModel` の既定はどちらも `v6`。C1 寄りの reference 表現が必要なときだけ `pixverse-c1` に上書きする
 12. **モデル表は `references/model-support.md` を見る** — CLI README と公式 skill の表を突き合わせた repo-local source of truth
 
 ---
@@ -87,7 +87,7 @@ pixverse create image \
 
 補足:
 - 複数の参照画像がある場合は `--image` の代わりに `--images` を使う
-- `gemini-3.1-flash` はこの workflow の既定値。PixVerse CLI 1.1.10 では `qwen-image`、`gpt-image-2.0`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども使える
+- `gemini-3.1-flash` はこの workflow の既定値。PixVerse CLI 1.1.12 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども使える
 
 ### Phase 2: カット画像生成
 
@@ -248,7 +248,7 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-既定では `generation.image.enabled: true` で、PixVerse `create image` を使ってベース静止画を作ってから I2V に渡す。添付画像が 1 枚でも複数枚でもこのフローを優先し、通常動画の `generation.model` は `v6` を維持する。`generation.image.model` は PixVerse CLI の image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p`。PixVerse CLI 1.1.10 の全モデル表は `references/model-support.md` を参照。`generation.image.prompt` が未指定なら `generation.prompt` を使う。`source: reference` は既定で `generation.referenceModel: v6` を使う。`generateAudio: true` は CLI の `--audio`、既定の `false` は `--no-audio` に対応する。
+既定では `generation.image.enabled: true` で、PixVerse `create image` を使ってベース静止画を作ってから I2V に渡す。添付画像が 1 枚でも複数枚でもこのフローを優先し、通常動画の `generation.model` は `v6` を維持する。`generation.image.model` は PixVerse CLI の image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p`。PixVerse CLI 1.1.12 の全モデル表は `references/model-support.md` を参照。`generation.image.prompt` が未指定なら `generation.prompt` を使う。`source: reference` は既定で `generation.referenceModel: v6` を使う。`generateAudio: true` は CLI の `--audio`、既定の `false` は `--no-audio` に対応する。
 
 `project.yaml` がない場合 → `references/interactive-questions.md` のフローでヒアリング。
 
@@ -313,7 +313,7 @@ pixverse create reference \
 
 注意:
 - `pixverse create reference --images` は 1-7 枚で使える
-- PixVerse CLI 1.1.10 の `create reference` は `v6` 対応。既定は `v6`、必要に応じて `pixverse-c1` へ上書きできる
+- PixVerse CLI 1.1.12 の `create reference` は `v6` 対応。既定は `v6`、必要に応じて `pixverse-c1` へ上書きできる
 - ただし pipeline config の `speaker.mode=reference` は 2-7 枚必須
 - 画像が1枚でも複数枚でも、明示的に story / teaser / trailer / multi-cut を求められた場合だけ `source: reference` を使う
 - `speaker.mode: reference` を使うのは、reference-driven workflow を明示したい場合だけ
@@ -401,6 +401,7 @@ cd remotion
 | `pixverse create speech --audio` | Audio-file lip sync |
 | `pixverse create video --audio` / `--no-audio` | Optional generated audio switch |
 | `pixverse create upscale --quality` | Optional final upscale |
+| `--idempotency-key` | Passed automatically by pipeline `run` for retry-safe create jobs |
 | `pixverse task wait <id> --type image\|video --json` | Wait for async jobs |
 | `pixverse asset download <id> --dest <dir> --type image\|video --json` | Download generated image/video |
 
