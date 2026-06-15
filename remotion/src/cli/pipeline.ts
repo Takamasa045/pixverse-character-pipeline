@@ -1,12 +1,19 @@
 import { describeConfigForCli, loadProjectConfig } from "../lib/config";
 import { getErrorMessage } from "../lib/helpers";
+import {
+  exportMichibikiHandoff,
+  type MichibikiEngine,
+  type MichibikiLicenseMode,
+  type MichibikiOutputType,
+  type MichibikiRemotionMode,
+} from "../lib/michibiki";
 import { executePipeline } from "../lib/pipeline";
 import { buildPipelinePlan } from "../lib/planner";
 import { runStoryWizard } from "../lib/story";
 import type { SupportedAspectRatio } from "../lib/types";
 
 type ParsedArgs = {
-  command: "plan" | "render" | "run" | "story" | "validate";
+  command: "export" | "plan" | "render" | "run" | "story" | "validate";
   options: Record<string, string | boolean>;
 };
 
@@ -15,6 +22,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
   if (
     commandRaw !== "validate" &&
+    commandRaw !== "export" &&
     commandRaw !== "plan" &&
     commandRaw !== "run" &&
     commandRaw !== "render" &&
@@ -58,6 +66,32 @@ const requiredOption = (options: Record<string, string | boolean>, key: string):
   }
 
   return value;
+};
+
+const stringOption = (
+  options: Record<string, string | boolean>,
+  key: string,
+): string | undefined => {
+  const value = options[key];
+  return typeof value === "string" ? value : undefined;
+};
+
+const oneOfOption = <T extends string>(
+  options: Record<string, string | boolean>,
+  key: string,
+  allowed: readonly T[],
+): T | undefined => {
+  const value = stringOption(options, key);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!allowed.includes(value as T)) {
+    throw new Error(`Invalid --${key}: ${value}. Expected one of: ${allowed.join(", ")}`);
+  }
+
+  return value as T;
 };
 
 const optionalRatio = (
@@ -104,8 +138,80 @@ const main = async (): Promise<void> => {
     return;
   }
 
+  if (parsed.command === "export") {
+    const handoff = await exportMichibikiHandoff({
+      config: loaded.config,
+      configPath: loaded.configPath,
+      options: {
+        allowCloudRender: parsed.options["allow-cloud-render"] === true,
+        dryRun: parsed.options["dry-run"] === true,
+        engine: oneOfOption<MichibikiEngine>(
+          parsed.options,
+          "engine",
+          ["auto", "editframe", "hyperframes", "remotion"],
+        ),
+        licenseMode: oneOfOption<MichibikiLicenseMode>(
+          parsed.options,
+          "license-mode",
+          ["client-work", "commercial", "oss", "personal"],
+        ),
+        michibikiPath: stringOption(parsed.options, "michibiki-path"),
+        outputType: oneOfOption<MichibikiOutputType>(
+          parsed.options,
+          "output-type",
+          ["code", "mp4", "preview", "project", "webm"],
+        ),
+        remotionMode: oneOfOption<MichibikiRemotionMode>(
+          parsed.options,
+          "remotion-mode",
+          ["auto", "monorepo", "standalone"],
+        ),
+        runMichibiki: parsed.options["run-michibiki"] === true,
+      },
+      outputDir: stringOption(parsed.options, "michibiki-handoff-dir"),
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: handoff.ok,
+          michibikiHandoffPath: handoff.handoffPath,
+          videoSpecPath: handoff.primarySpecPath,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exitCode = handoff.ok ? 0 : 1;
+    return;
+  }
+
   const result = await executePipeline(loaded, {
     dryRun: parsed.options["dry-run"] === true,
+    michibikiHandoff:
+      parsed.options["michibiki-handoff"] === true ||
+      parsed.options["run-michibiki"] === true ||
+      typeof parsed.options["michibiki-handoff-dir"] === "string"
+        ? {
+            engine: oneOfOption<MichibikiEngine>(
+              parsed.options,
+              "michibiki-engine",
+              ["auto", "editframe", "hyperframes", "remotion"],
+            ),
+            enabled: true,
+            michibikiPath: stringOption(parsed.options, "michibiki-path"),
+            outputDir:
+              typeof parsed.options["michibiki-handoff-dir"] === "string"
+                ? parsed.options["michibiki-handoff-dir"]
+                : undefined,
+            remotionMode: oneOfOption<MichibikiRemotionMode>(
+              parsed.options,
+              "remotion-mode",
+              ["auto", "monorepo", "standalone"],
+            ),
+            runMichibiki: parsed.options["run-michibiki"] === true,
+          }
+        : undefined,
     mode: parsed.command,
     runId: typeof parsed.options["run-id"] === "string" ? parsed.options["run-id"] : undefined,
     targetLanguage: typeof parsed.options.lang === "string" ? parsed.options.lang : undefined,
@@ -115,8 +221,13 @@ const main = async (): Promise<void> => {
   console.log(
     JSON.stringify(
       {
-        ok: result.runManifest.summary.failed === 0,
+        ok:
+          result.runManifest.summary.failed === 0 &&
+          result.michibikiHandoffOk !== false,
         manifestPath: result.runManifestPath,
+        ...(result.michibikiHandoffPath
+          ? { michibikiHandoffPath: result.michibikiHandoffPath }
+          : {}),
         plan: result.plan.totals,
         summary: result.runManifest.summary,
       },

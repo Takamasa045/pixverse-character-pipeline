@@ -265,6 +265,78 @@ output/<project-slug>/<run-id>/
 
 Remotion 用の staging は `remotion/public/.pipeline/` に自動生成されます。
 
+## Michibiki への任意 export / handoff
+
+Remotion / HyperFrames / Editframe などの動画 project 生成を [Michibiki](https://github.com/Takamasa045/michibiki) 側に任せたい場合は、PixVerse Shotpack と同じように `export` を使います。
+
+```bash
+cd remotion
+./bin/pipeline export \
+  --config ../fixtures/generated/project.yaml \
+  --engine remotion
+```
+
+既定では次の場所に Michibiki 用ファイルが出ます。
+
+```text
+output/<project-slug>/michibiki/
+  handoff.json
+  video-spec.json
+  video-specs/<lang>-<ratio>.json
+  README.md
+```
+
+この pipeline から Michibiki の project 生成まで呼びたい場合は、`--run-michibiki` と `--michibiki-path` を付けます。
+
+```bash
+./bin/pipeline export \
+  --config ../fixtures/generated/project.yaml \
+  --engine remotion \
+  --remotion-mode standalone \
+  --michibiki-path ../../michibiki \
+  --run-michibiki
+```
+
+これは Michibiki リポジトリ上で `pnpm michibiki generate --spec ... --engine remotion --remotion-mode standalone` を実行します。Michibiki の preview や最終 render は実行しません。そこは Michibiki 側で明示的に実行します。外部の Remotion monorepo をあえて使いたい場合だけ `--remotion-mode standalone` を外します。
+
+PixVerse Character Pipeline で作った動画を Michibiki 側でエンジン選定、タイムライン編集、preview、再編集に回したい場合は、`--michibiki-handoff` を付けます。
+
+```bash
+cd remotion
+./bin/pipeline run \
+  --config ../fixtures/generated/project.yaml \
+  --dry-run \
+  --michibiki-handoff
+```
+
+既定では run manifest の隣に handoff が出ます。
+
+```text
+output/<project-slug>/<run-id>/michibiki/
+  handoff.json
+  video-spec.json
+  video-specs/<lang>-<ratio>.json
+  README.md
+```
+
+- `video-spec.json` は Michibiki に渡す主 `VideoSpec`
+- `video-specs/` は locale / aspect ratio ごとの `VideoSpec`
+- `handoff.json` は全 variant、PixVerse の `manifest.json` への参照、Michibiki の推奨コマンドを記録
+- `--michibiki-handoff-dir <dir>` で出力先を変更可能
+- `--michibiki-engine remotion|hyperframes|editframe|auto` で run handoff の推奨エンジンを変更可能
+
+Michibiki 側では次のように読み込みます。
+
+```bash
+cd ../michibiki
+pnpm michibiki decide --spec ../pixverse-character-pipeline/output/<project-slug>/<run-id>/michibiki/video-spec.json
+pnpm michibiki generate --spec ../pixverse-character-pipeline/output/<project-slug>/<run-id>/michibiki/video-spec.json --engine editframe
+```
+
+Michibiki 側で生成される編集 project、preview、最終 render は、Michibiki リポジトリ内の `outputs/jobs/<job-id>/` に保存されます。Character Pipeline 側には、元の render と handoff ファイルだけを `output/<project-slug>/<run-id>/` 配下に残します。
+
+dry-run でも予定パスつきの handoff は作れます。実際に Michibiki で編集・preview する場合は、参照先 MP4 が存在するように real `run` または local `render` 後に handoff を使ってください。
+
 ## セットアップ
 
 ### 0. リポジトリをクローンする

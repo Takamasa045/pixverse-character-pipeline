@@ -2,6 +2,11 @@ import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, relative, resolve } from "node:path";
 import { buildRenderManifest } from "./manifest";
 import {
+  writeMichibikiHandoff,
+  type MichibikiEngine,
+  type MichibikiRemotionMode,
+} from "./michibiki";
+import {
   createBaseImage,
   createBaseVideo,
   createReferenceVideo,
@@ -31,6 +36,14 @@ const VIDEO_EXTENSIONS = [".mp4"];
 
 type ExecutePipelineOptions = {
   dryRun?: boolean;
+  michibikiHandoff?: {
+    engine?: MichibikiEngine;
+    enabled: boolean;
+    michibikiPath?: string;
+    outputDir?: string;
+    remotionMode?: MichibikiRemotionMode;
+    runMichibiki?: boolean;
+  };
   mode: "render" | "run";
   runId?: string;
   targetLanguage?: string;
@@ -513,6 +526,8 @@ export const executePipeline = async (
   loaded: LoadedConfig,
   options: ExecutePipelineOptions,
 ): Promise<{
+  michibikiHandoffOk?: boolean;
+  michibikiHandoffPath?: string;
   plan: PipelinePlan;
   runManifest: RunManifest;
   runManifestPath: string;
@@ -667,7 +682,26 @@ export const executePipeline = async (
   const runManifestPath = resolve(runRoot, "manifest.json");
   await writeJson(runManifestPath, runManifest);
 
+  const michibikiHandoff = options.michibikiHandoff?.enabled
+    ? await writeMichibikiHandoff({
+        config: loaded.config,
+        options: {
+          dryRun: options.dryRun,
+          engine: options.michibikiHandoff.engine,
+          michibikiPath: options.michibikiHandoff.michibikiPath,
+          remotionMode: options.michibikiHandoff.remotionMode,
+          runMichibiki: options.michibikiHandoff.runMichibiki,
+        },
+        outputDir: options.michibikiHandoff.outputDir,
+        runManifest,
+        runManifestPath,
+        runRoot,
+      })
+    : undefined;
+
   return {
+    michibikiHandoffOk: michibikiHandoff?.ok,
+    michibikiHandoffPath: michibikiHandoff?.handoffPath,
     plan,
     runManifest,
     runManifestPath,

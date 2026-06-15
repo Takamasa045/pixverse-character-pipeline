@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { access, readFile, rm } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { runCommand } from "../lib/subprocess";
 
 const repoRoot = resolve(process.cwd(), "..");
@@ -77,6 +77,100 @@ test("pipeline run dry-run writes a manifest", async () => {
   assert.equal(manifest.summary.planned, 4);
   assert.equal(manifest.variants[0].baseImageId, null);
   assert.equal(manifest.variants[0].baseImageAsset, null);
+});
+
+test("pipeline run dry-run can write a Michibiki handoff", async () => {
+  const runId = "michibiki-handoff-test";
+  const runDir = resolve(outputRoot, "mixed-generated", runId);
+  await rm(runDir, { force: true, recursive: true });
+
+  const result = await runCommand(
+    pipelineBin,
+    [
+      "run",
+      "--config",
+      "../fixtures/generated/project.yaml",
+      "--dry-run",
+      "--run-id",
+      runId,
+      "--michibiki-handoff",
+    ],
+    {
+      captureOutput: true,
+      cwd: process.cwd(),
+    },
+  );
+
+  const payload = parseTrailingJson(result.stdout);
+  const handoffPath = payload.michibikiHandoffPath as string;
+  const handoffDir = dirname(handoffPath);
+  const handoff = JSON.parse(await readFile(handoffPath, "utf8"));
+  const spec = JSON.parse(await readFile(resolve(handoffDir, "video-spec.json"), "utf8"));
+
+  assert.equal(payload.ok, true);
+  assert.equal(handoff.source, "pixverse-character-pipeline");
+  assert.equal(handoff.status, "planned");
+  assert.equal(handoff.michibiki.outputRoot, "outputs/jobs/<job-id>");
+  assert.deepEqual(
+    handoff.michibiki.commands.generate.slice(0, 4),
+    ["pnpm", "michibiki", "generate", "--spec"],
+  );
+  assert.equal(handoff.michibiki.commands.generate.includes("--outputs"), false);
+  assert.equal(handoff.michibiki.commands.generate.includes("editframe"), true);
+  assert.equal(handoff.variants.length, 4);
+  assert.equal(handoff.variants[0].videoSpec, "video-specs/ja-16x9.json");
+  assert.equal(spec.constraints.enginePreference, "editframe");
+  assert.equal(spec.assets[0].type, "video");
+  assert.equal(spec.assets[0].source, "../ja/16x9/character.mp4");
+});
+
+test("pipeline export writes a Michibiki VideoSpec for downstream project generation", async () => {
+  const handoffDir = resolve(outputRoot, "mixed-generated", "michibiki-export-test");
+  await rm(handoffDir, { force: true, recursive: true });
+
+  const result = await runCommand(
+    pipelineBin,
+    [
+      "export",
+      "--config",
+      "../fixtures/generated/project.yaml",
+      "--engine",
+      "remotion",
+      "--remotion-mode",
+      "standalone",
+      "--michibiki-handoff-dir",
+      handoffDir,
+      "--michibiki-path",
+      "/tmp/michibiki-placeholder",
+      "--run-michibiki",
+      "--dry-run",
+    ],
+    {
+      captureOutput: true,
+      cwd: process.cwd(),
+    },
+  );
+
+  const payload = parseTrailingJson(result.stdout);
+  const handoffPath = payload.michibikiHandoffPath as string;
+  const specPath = payload.videoSpecPath as string;
+  const handoff = JSON.parse(await readFile(handoffPath, "utf8"));
+  const spec = JSON.parse(await readFile(specPath, "utf8"));
+
+  assert.equal(payload.ok, true);
+  assert.equal(specPath, resolve(handoffDir, "video-spec.json"));
+  assert.equal(handoff.source, "pixverse-character-pipeline");
+  assert.equal(handoff.status, "planned");
+  assert.equal(handoff.runManifest, null);
+  assert.equal(handoff.michibiki.engine, "remotion");
+  assert.equal(handoff.michibiki.run.ran, false);
+  assert.equal(handoff.michibiki.run.dryRun, true);
+  assert.equal(handoff.michibiki.commands.generate.includes("remotion"), true);
+  assert.equal(handoff.michibiki.commands.generate.includes("standalone"), true);
+  assert.equal(spec.constraints.enginePreference, "remotion");
+  assert.equal(spec.assets.some((asset: { type: string }) => asset.type === "image"), true);
+  assert.equal(spec.assets.some((asset: { type: string }) => asset.type === "video"), true);
+  assert.equal(spec.assets[0].source.startsWith("/"), false);
 });
 
 test("pipeline run dry-run allows generated clips without narration", async () => {

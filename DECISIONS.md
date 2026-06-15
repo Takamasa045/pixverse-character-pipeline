@@ -26,6 +26,36 @@ Follow-up:
 - ...
 ```
 
+## 2026-06-15 - Add optional Michibiki export and handoff
+
+Status: accepted
+
+Decision:
+
+- Keep Michibiki integration optional and opt-in through `export`, `--michibiki-handoff`, and `--run-michibiki`.
+- Use `export --engine remotion|hyperframes|editframe|auto` as the Shotpack-like path for generating downstream video projects in Michibiki.
+- Write Michibiki-compatible `VideoSpec` files under the ignored run output, not tracked docs.
+- Prefer Editframe as the handoff default because PixVerse outputs are finished video assets that usually need timeline editing or repurposing.
+
+Reason:
+
+- PixVerse Character Pipeline should remain the generation/render source of truth.
+- Michibiki should receive a clean downstream handoff without changing the normal pipeline or spending extra PixVerse credits.
+- Remotion / HyperFrames / Editframe project generation belongs in Michibiki when the user wants engine routing or downstream video project scaffolding.
+- Public docs can explain the integration without exposing local absolute paths or private generated output.
+
+Impacted files:
+
+- `remotion/src/lib/michibiki.ts`
+- `remotion/src/lib/pipeline.ts`
+- `remotion/src/cli/pipeline.ts`
+- `README.md`
+- `README.ja.md`
+
+Follow-up:
+
+- If Michibiki expands `VideoSpec` aspect-ratio support, remove or reduce skipped handoff variants.
+
 ## 2026-06-08 - Treat operating docs as public OSS workflow
 
 Status: accepted

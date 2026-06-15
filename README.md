@@ -236,6 +236,78 @@ output/<project-slug>/<run-id>/
 
 Remotion staging assets are generated automatically under `remotion/public/.pipeline/`.
 
+## Optional Michibiki Export / Handoff
+
+Use `export` when Remotion, HyperFrames, or Editframe project generation should happen in [Michibiki](https://github.com/Takamasa045/michibiki), similar to the PixVerse Shotpack handoff.
+
+```bash
+cd remotion
+./bin/pipeline export \
+  --config ../fixtures/generated/project.yaml \
+  --engine remotion
+```
+
+By default the export is written under:
+
+```text
+output/<project-slug>/michibiki/
+  handoff.json
+  video-spec.json
+  video-specs/<lang>-<ratio>.json
+  README.md
+```
+
+Add `--run-michibiki` and `--michibiki-path` to ask this pipeline to invoke Michibiki project generation:
+
+```bash
+./bin/pipeline export \
+  --config ../fixtures/generated/project.yaml \
+  --engine remotion \
+  --remotion-mode standalone \
+  --michibiki-path ../../michibiki \
+  --run-michibiki
+```
+
+This runs `pnpm michibiki generate --spec ... --engine remotion --remotion-mode standalone` from the Michibiki repository. It does not run Michibiki preview or final render; those remain explicit Michibiki-side steps. Omit `--remotion-mode standalone` if you intentionally want Michibiki to use an external Remotion monorepo.
+
+Use `--michibiki-handoff` when an already planned or rendered PixVerse Character Pipeline output should continue in Michibiki for engine routing, timeline editing, preview, or repurposing.
+
+```bash
+cd remotion
+./bin/pipeline run \
+  --config ../fixtures/generated/project.yaml \
+  --dry-run \
+  --michibiki-handoff
+```
+
+The handoff is written next to the run manifest by default:
+
+```text
+output/<project-slug>/<run-id>/michibiki/
+  handoff.json
+  video-spec.json
+  video-specs/<lang>-<ratio>.json
+  README.md
+```
+
+- `video-spec.json` is the primary Michibiki `VideoSpec`.
+- `video-specs/` contains one spec per supported locale / aspect-ratio variant.
+- `handoff.json` lists all variants, points back to the PixVerse `manifest.json`, and records the recommended Michibiki commands.
+- `--michibiki-handoff-dir <dir>` writes the handoff somewhere else.
+- `--michibiki-engine remotion|hyperframes|editframe|auto` changes the recommended engine for run handoffs.
+
+Then run Michibiki from its repository:
+
+```bash
+cd ../michibiki
+pnpm michibiki decide --spec ../pixverse-character-pipeline/output/<project-slug>/<run-id>/michibiki/video-spec.json
+pnpm michibiki generate --spec ../pixverse-character-pipeline/output/<project-slug>/<run-id>/michibiki/video-spec.json --engine editframe
+```
+
+Michibiki saves generated projects, previews, and final renders under `outputs/jobs/<job-id>/` in the Michibiki repository. Character Pipeline keeps only the source renders and handoff files under `output/<project-slug>/<run-id>/`.
+
+Dry-runs produce a planned handoff with predicted final MP4 paths. For actual downstream editing, run the handoff after a real `run` or local `render` so the referenced MP4 exists.
+
 ## Fixtures / Tests
 
 - `fixtures/basic/project.yaml`: local `video` + `image` render smoke test
