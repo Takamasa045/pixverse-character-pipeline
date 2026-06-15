@@ -2,7 +2,7 @@
 
 English | [日本語](#lang-ja) | [简体中文](#lang-zh) | [한국어](#lang-ko) | [Español](#lang-es) | [Français](#lang-fr)
 
-> Translations below are concise onboarding sections in this README. The detailed command reference continues in English after the language summaries.
+> Each language section below includes the full prose guide. CLI commands, YAML keys, and file names stay in their literal form so they match the actual runtime.
 
 ## English
 
@@ -18,6 +18,53 @@ Create Japanese and English announcement videos from this character image.
 Use a photoreal studio background, 16:9 and 9:16, then prepare a Michibiki handoff.
 Show me the dry-run plan first.
 ```
+
+### Agent Compatibility
+
+This repo is designed to work with both Claude Code and Codex. The runtime is tool-agnostic: `project.yaml` and `remotion/./bin/pipeline` are the core interface. `.claude/*` files are optional local helpers, not required runtime inputs. `CLAUDE.md` and `AGENTS.md` describe the same workflow from each agent's entrypoint.
+
+### What It Does
+
+- Turn a character image into a talking character video placed in a photoreal, live-action-style environment.
+- Batch-process projects from `project.yaml` across multiple locales and aspect ratios.
+- Mix `generated | reference | video | image` clips in the same timeline.
+- Turn PixVerse outputs into `manifest.render.json` files and final `character.mp4` renders.
+- Accept legacy `spokesperson.yaml` as a backward-compatible input format.
+- Prepare optional Michibiki handoff files for Remotion, HyperFrames, or Editframe workflows.
+
+### Request and Execution Flow
+
+The entry point is a natural-language request, not a command. The agent normalizes the request into `project.yaml`. If information is missing, it asks briefly for the project name, character image, target locales, clip composition, aspect ratios, and background direction.
+
+Execution starts with `validate`, then `plan`, then `run --dry-run` when review is needed. A full `run` can consume PixVerse credits and requires explicit approval. Configs using only local `video` / `image` clips use `render`.
+
+For story / teaser / trailer requests, the default behavior is to split the concept into 3-5 beats and write each beat as a `source: reference` clip. For the normal attached-character-image workflow, defaults are `speaker.mode: single`, `generation.model: v6`, `generation.referenceModel: v6`, and `generation.image.enabled: true`.
+
+### Setup and Main Commands
+
+Prerequisites are Node.js 20+, a PixVerse account, and an active subscription. Run `pnpm install` inside `remotion` to install dependencies and the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). Login with `pixverse auth login`; check status with `pixverse auth status` and `pixverse account info`.
+
+Main commands are `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story`, and `./bin/pipeline render`. Prefer `./bin/pipeline` over `pnpm pipeline:*` when shell PATH resolution is unreliable.
+
+### `project.yaml` and Output
+
+`project.yaml` contains `project`, `speaker`, `locales`, `render`, and `generation`. Each locale defines its own `clips`; every clip uses one source type: `generated`, `reference`, `video`, or `image`.
+
+PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` as shared video motion prompts. The default path creates a base still through PixVerse I2I, then runs I2V from that image. `source: reference` clips use a per-cut `prompt` and are generated with `pixverse create reference --images`.
+
+Outputs are grouped under `output/<project-slug>/<run-id>/`, including the batch `manifest.json`, per-variant `manifest.render.json`, final `character.mp4`, and staging assets.
+
+### Michibiki Integration
+
+Michibiki is an optional downstream video-production layer. Use it when PixVerse Character Pipeline should produce source renders and manifests, then hand them to Remotion, HyperFrames, or Editframe for project generation, preview, or repurposing.
+
+`export` creates Michibiki `handoff.json`, `video-spec.json`, and per-variant `video-specs/<lang>-<ratio>.json`. With `--run-michibiki` and `--michibiki-path`, this pipeline can invoke Michibiki project generation, but preview and final render remain explicit Michibiki-side steps.
+
+Use `--michibiki-handoff` when an already planned or rendered output should continue in Michibiki. Dry-runs can create planned handoffs with predicted paths, but real editing should use a handoff after a real `run` or local `render` so the referenced MP4 exists.
+
+### Fixtures / Tests
+
+`fixtures/basic/project.yaml` is for local render smoke tests, `fixtures/generated/project.yaml` is for generated / video / image plan and dry-run checks, `fixtures/reference-story/project.yaml` is for per-cut reference stories, and `fixtures/legacy/spokesperson.yaml` checks legacy compatibility. Validate with `pnpm typecheck` and `pnpm test` inside `remotion`.
 
 All image and video generation paths documented in this repo are implemented through PixVerse CLI; Remotion is used for staging and the final render only.
 
@@ -38,6 +85,53 @@ All image and video generation paths documented in this repo are implemented thr
 まずは dry-run の計画だけ見せて。
 ```
 
+### エージェント互換性
+
+この repo は Claude Code と Codex のどちらでも使えるように整理しています。実行本体は tool-agnostic で、`project.yaml` と `remotion/./bin/pipeline` が中心です。`.claude/*` はローカル補助設定であり、必須ではありません。`CLAUDE.md` と `AGENTS.md` は、それぞれのエージェント入口向けに同じ workflow を説明します。
+
+### できること
+
+- キャラクター画像を、実写風背景になじむ talking character video にする。
+- `project.yaml` から複数言語・複数アスペクト比の variant を batch 処理する。
+- `generated | reference | video | image` clip を同じ timeline に混在させる。
+- PixVerse の出力を `manifest.render.json` と最終 `character.mp4` に変換する。
+- legacy の `spokesperson.yaml` を後方互換入力として受け付ける。
+- Michibiki へ渡す Remotion / HyperFrames / Editframe 向け handoff を作る。
+
+### 依頼と実行の流れ
+
+入口はコマンドではなく自然文です。エージェントは依頼文を `project.yaml` に正規化し、必要な情報が足りない場合は案件名、キャラ画像、生成言語、clip 構成、アスペクト比、背景方向性の順に短く確認します。
+
+実行は `validate`、`plan`、必要に応じて `run --dry-run` の順に確認し、PixVerse credit を使う通常の `run` は明示許可後に行います。ローカル `video` / `image` だけを使う config では `render` を使います。
+
+story / teaser / trailer では、3-5 個の beat に分解し、各 beat を `source: reference` として個別生成します。キャラ画像が添付された通常 workflow では、既定で `speaker.mode: single`、`generation.model: v6`、`generation.referenceModel: v6`、`generation.image.enabled: true` を使います。
+
+### セットアップと主なコマンド
+
+前提は Node.js 20+、PixVerse account、有効な subscription です。`cd remotion` して `pnpm install` を実行すると、repo-pinned の PixVerse CLI (`pixverse@^1.1.12`) も入ります。ログインは `pixverse auth login`、確認は `pixverse auth status` と `pixverse account info` です。
+
+主な入口は `./bin/pipeline validate`、`./bin/pipeline plan`、`./bin/pipeline run --dry-run`、`./bin/pipeline story`、`./bin/pipeline render` です。PATH 解決が不安定な環境では `pnpm pipeline:*` より `./bin/pipeline` を優先します。
+
+### `project.yaml` と出力
+
+`project.yaml` は `project`、`speaker`、`locales`、`render`、`generation` を持ちます。`locales` 配下に言語ごとの `clips` を置き、各 clip は `generated`、`reference`、`video`、`image` のいずれかになります。
+
+PixVerse は `generation.prompt.base` / `generation.prompt.perRatio` を動画 motion prompt として使います。既定では PixVerse I2I で base still を作り、その画像から I2V を実行します。`source: reference` clip は各 cut の `prompt` を使って `pixverse create reference --images` で個別生成されます。
+
+出力は `output/<project-slug>/<run-id>/` 配下にまとまり、batch 全体の `manifest.json`、variant ごとの `manifest.render.json`、最終 `character.mp4`、staging assets が残ります。
+
+### Michibiki 連携
+
+Michibiki は後段の動画制作レイヤーです。PixVerse Character Pipeline で作った source render や manifest を、Remotion / HyperFrames / Editframe の project 生成、preview、再編集へ渡したいときに使います。
+
+`export` は Michibiki 用の `handoff.json`、`video-spec.json`、variant ごとの `video-specs/<lang>-<ratio>.json` を作ります。`--run-michibiki` と `--michibiki-path` を付けると Michibiki 側の project generation まで呼べますが、preview や final render は Michibiki 側で明示実行します。
+
+すでに `run` または `render` した結果を Michibiki に続けたい場合は `--michibiki-handoff` を使います。dry-run でも予定 path 付き handoff は作れますが、実編集には参照先 MP4 が存在する real `run` または local `render` 後の handoff を使います。
+
+### Fixtures / Tests
+
+`fixtures/basic/project.yaml` は local render smoke、`fixtures/generated/project.yaml` は generated / video / image 混在の plan / dry-run、`fixtures/reference-story/project.yaml` は per-cut reference story、`fixtures/legacy/spokesperson.yaml` は legacy 互換確認用です。検証は `cd remotion` 後に `pnpm typecheck` と `pnpm test` を実行します。
+
 <a id="lang-zh"></a>
 
 ## 简体中文
@@ -54,6 +148,53 @@ All image and video generation paths documented in this repo are implemented thr
 背景使用写实摄影棚风格，输出 16:9 和 9:16，并准备 Michibiki handoff。
 请先给我 dry-run 计划。
 ```
+
+### Agent 兼容性
+
+这个仓库可以同时配合 Claude Code 和 Codex 使用。运行核心与具体工具无关，主要入口是 `project.yaml` 和 `remotion/./bin/pipeline`。`.claude/*` 只是本地辅助配置，不是运行必需项。`CLAUDE.md` 和 `AGENTS.md` 分别面向不同 Agent 入口说明同一套 workflow。
+
+### 功能范围
+
+- 将角色图片转换成置于写实环境中的 talking character video。
+- 通过 `project.yaml` 批量生成多语言、多画幅 variant。
+- 在同一 timeline 中混合 `generated | reference | video | image` clip。
+- 将 PixVerse 输出整理成 `manifest.render.json` 和最终 `character.mp4`。
+- 兼容旧格式 `spokesperson.yaml`。
+- 生成可交给 Michibiki 的 Remotion / HyperFrames / Editframe handoff 文件。
+
+### 请求与执行流程
+
+入口是自然语言请求，而不是命令。Agent 会把请求整理成 `project.yaml`。如果信息不足，会按项目名、角色图片、目标语言、clip 结构、画幅、背景方向的顺序简短确认。
+
+执行时先运行 `validate`、`plan`，必要时再运行 `run --dry-run`。会消耗 PixVerse credits 的正式 `run` 需要明确许可。只使用本地 `video` / `image` 素材的 config 使用 `render`。
+
+story / teaser / trailer 请求默认拆成 3-5 个 beat，并把每个 beat 写成 `source: reference` clip。普通角色图片 workflow 默认使用 `speaker.mode: single`、`generation.model: v6`、`generation.referenceModel: v6`、`generation.image.enabled: true`。
+
+### 安装与主要命令
+
+需要 Node.js 20+、PixVerse account 和有效 subscription。在 `remotion` 目录执行 `pnpm install` 会安装 repo-pinned PixVerse CLI (`pixverse@^1.1.12`)。登录使用 `pixverse auth login`，状态检查使用 `pixverse auth status` 和 `pixverse account info`。
+
+主要入口是 `./bin/pipeline validate`、`./bin/pipeline plan`、`./bin/pipeline run --dry-run`、`./bin/pipeline story`、`./bin/pipeline render`。如果 shell PATH 不稳定，优先使用 `./bin/pipeline`，而不是 `pnpm pipeline:*`。
+
+### `project.yaml` 与输出
+
+`project.yaml` 包含 `project`、`speaker`、`locales`、`render`、`generation`。`locales` 中放置各语言的 `clips`，每个 clip 的 `source` 可以是 `generated`、`reference`、`video` 或 `image`。
+
+PixVerse 使用 `generation.prompt.base` / `generation.prompt.perRatio` 作为视频 motion prompt。默认流程是 PixVerse I2I 生成 base still，再从该图片执行 I2V。`source: reference` clip 会使用每个 cut 的 `prompt`，通过 `pixverse create reference --images` 单独生成。
+
+输出会集中在 `output/<project-slug>/<run-id>/`。其中包含 batch 级 `manifest.json`、variant 级 `manifest.render.json`、最终 `character.mp4` 和 staging assets。
+
+### Michibiki 集成
+
+Michibiki 是后续视频制作层。它用于把 PixVerse Character Pipeline 生成的 source render 和 manifest 交给 Remotion / HyperFrames / Editframe，继续进行项目生成、预览或再编辑。
+
+`export` 会生成 Michibiki 用的 `handoff.json`、`video-spec.json` 和每个 variant 的 `video-specs/<lang>-<ratio>.json`。加上 `--run-michibiki` 和 `--michibiki-path` 可以从此 pipeline 调用 Michibiki 的 project generation，但 preview 和 final render 仍需在 Michibiki 中显式执行。
+
+如果已经完成 `run` 或 `render`，并想继续交给 Michibiki，请使用 `--michibiki-handoff`。dry-run 也可以生成带预测路径的 handoff，但真正编辑时应使用 real `run` 或 local `render` 后、引用 MP4 已存在的 handoff。
+
+### Fixtures / Tests
+
+`fixtures/basic/project.yaml` 用于 local render smoke test，`fixtures/generated/project.yaml` 用于 generated / video / image 混合的 plan / dry-run，`fixtures/reference-story/project.yaml` 用于 per-cut reference story，`fixtures/legacy/spokesperson.yaml` 用于 legacy 兼容。验证时在 `remotion` 目录运行 `pnpm typecheck` 和 `pnpm test`。
 
 <a id="lang-ko"></a>
 
@@ -72,6 +213,53 @@ All image and video generation paths documented in this repo are implemented thr
 먼저 dry-run 계획을 보여 주세요.
 ```
 
+### Agent 호환성
+
+이 저장소는 Claude Code와 Codex 모두에서 사용할 수 있도록 정리되어 있습니다. 실행 핵심은 특정 도구에 묶이지 않으며, `project.yaml`과 `remotion/./bin/pipeline`이 중심입니다. `.claude/*`는 로컬 보조 설정일 뿐 필수 실행 조건은 아닙니다. `CLAUDE.md`와 `AGENTS.md`는 각 Agent 진입점에 맞춰 같은 workflow를 설명합니다.
+
+### 할 수 있는 일
+
+- 캐릭터 이미지를 실사풍 환경에 자연스럽게 들어간 talking character video로 만듭니다.
+- `project.yaml`을 기반으로 여러 언어와 여러 화면비 variant를 batch 처리합니다.
+- 같은 timeline 안에서 `generated | reference | video | image` clip을 섞어 사용할 수 있습니다.
+- PixVerse 출력을 `manifest.render.json`과 최종 `character.mp4`로 정리합니다.
+- 기존 `spokesperson.yaml`을 backward-compatible 입력으로 받을 수 있습니다.
+- Michibiki로 넘길 Remotion / HyperFrames / Editframe handoff 파일을 준비합니다.
+
+### 요청과 실행 흐름
+
+진입점은 명령어가 아니라 자연어 요청입니다. Agent는 요청을 `project.yaml`로 정규화합니다. 정보가 부족하면 프로젝트 이름, 캐릭터 이미지, 대상 언어, clip 구성, 화면비, 배경 방향 순서로 짧게 확인합니다.
+
+실행은 `validate`, `plan`, 필요 시 `run --dry-run` 순서로 확인합니다. PixVerse 크레딧을 사용하는 실제 `run`은 명시적인 허가 후에 실행합니다. 로컬 `video` / `image` clip만 사용하는 config는 `render`를 사용합니다.
+
+story / teaser / trailer 요청은 기본적으로 3-5개의 beat로 나누고, 각 beat를 `source: reference` clip으로 작성합니다. 일반 캐릭터 이미지 workflow는 기본적으로 `speaker.mode: single`, `generation.model: v6`, `generation.referenceModel: v6`, `generation.image.enabled: true`를 사용합니다.
+
+### 설정과 주요 명령
+
+필요 조건은 Node.js 20+, PixVerse account, 활성 subscription입니다. `remotion` 디렉터리에서 `pnpm install`을 실행하면 repo-pinned PixVerse CLI (`pixverse@^1.1.12`)도 설치됩니다. 로그인은 `pixverse auth login`, 확인은 `pixverse auth status`와 `pixverse account info`를 사용합니다.
+
+주요 진입점은 `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story`, `./bin/pipeline render`입니다. shell PATH 해석이 불안정한 환경에서는 `pnpm pipeline:*`보다 `./bin/pipeline`을 우선 사용합니다.
+
+### `project.yaml`과 출력
+
+`project.yaml`은 `project`, `speaker`, `locales`, `render`, `generation`으로 구성됩니다. `locales` 아래에는 언어별 `clips`를 두며, 각 clip은 `generated`, `reference`, `video`, `image` 중 하나를 source로 가집니다.
+
+PixVerse는 `generation.prompt.base` / `generation.prompt.perRatio`를 공유 video motion prompt로 사용합니다. 기본 경로는 PixVerse I2I로 base still을 만든 뒤, 그 이미지를 사용해 I2V를 실행하는 방식입니다. `source: reference` clip은 cut별 `prompt`를 사용해 `pixverse create reference --images`로 개별 생성됩니다.
+
+출력은 `output/<project-slug>/<run-id>/` 아래에 모입니다. 여기에는 batch 전체 `manifest.json`, variant별 `manifest.render.json`, 최종 `character.mp4`, staging assets가 포함됩니다.
+
+### Michibiki 연동
+
+Michibiki는 후단 영상 제작 레이어입니다. PixVerse Character Pipeline이 만든 source render와 manifest를 Remotion / HyperFrames / Editframe 프로젝트 생성, preview, 재편집으로 넘기고 싶을 때 사용합니다.
+
+`export`는 Michibiki용 `handoff.json`, `video-spec.json`, variant별 `video-specs/<lang>-<ratio>.json`을 만듭니다. `--run-michibiki`와 `--michibiki-path`를 추가하면 이 pipeline에서 Michibiki project generation까지 호출할 수 있지만, preview와 final render는 Michibiki 쪽에서 명시적으로 실행해야 합니다.
+
+이미 `run` 또는 `render`한 결과를 Michibiki에서 이어가려면 `--michibiki-handoff`를 사용합니다. dry-run도 예상 경로가 포함된 handoff를 만들 수 있지만, 실제 편집에는 참조 MP4가 존재하는 real `run` 또는 local `render` 이후의 handoff를 사용합니다.
+
+### Fixtures / Tests
+
+`fixtures/basic/project.yaml`은 local render smoke test용, `fixtures/generated/project.yaml`은 generated / video / image 혼합 plan / dry-run용, `fixtures/reference-story/project.yaml`은 per-cut reference story용, `fixtures/legacy/spokesperson.yaml`은 legacy 호환 확인용입니다. 검증은 `remotion` 디렉터리에서 `pnpm typecheck`와 `pnpm test`를 실행합니다.
+
 <a id="lang-es"></a>
 
 ## Español
@@ -89,6 +277,53 @@ Usa un fondo de estudio fotorrealista, 16:9 y 9:16, y prepara un handoff para Mi
 Primero muéstrame el plan dry-run.
 ```
 
+### Compatibilidad con agentes
+
+Este repositorio está organizado para funcionar tanto con Claude Code como con Codex. El runtime es independiente de la herramienta: el centro es `project.yaml` junto con `remotion/./bin/pipeline`. Los archivos `.claude/*` son ayudas locales opcionales, no requisitos para ejecutar el pipeline. `CLAUDE.md` y `AGENTS.md` describen el mismo workflow desde cada punto de entrada.
+
+### Qué hace
+
+- Convierte una imagen de personaje en un talking character video integrado en un entorno fotorrealista.
+- Procesa proyectos desde `project.yaml` en varios idiomas y relaciones de aspecto.
+- Mezcla clips `generated | reference | video | image` en la misma timeline.
+- Convierte salidas de PixVerse en `manifest.render.json` y videos finales `character.mp4`.
+- Acepta `spokesperson.yaml` como formato legacy compatible.
+- Prepara archivos de handoff para Michibiki, Remotion, HyperFrames o Editframe.
+
+### Cómo pedirlo y cómo se ejecuta
+
+El punto de entrada es una solicitud en lenguaje natural, no un comando. El agente normaliza la solicitud en `project.yaml`. Si faltan datos, pregunta en este orden: nombre del proyecto, imagen del personaje, idiomas objetivo, composición de clips, relaciones de aspecto y dirección visual del fondo.
+
+La ejecución empieza con `validate`, sigue con `plan` y usa `run --dry-run` cuando se quiere revisar antes. El `run` real, que puede gastar créditos de PixVerse, requiere aprobación explícita. Para configs que solo usan clips locales `video` / `image`, se usa `render`.
+
+Para story / teaser / trailer, el comportamiento por defecto es dividir la idea en 3-5 beats y escribir cada beat como un clip `source: reference`. Para una imagen de personaje normal, el default es `speaker.mode: single`, `generation.model: v6`, `generation.referenceModel: v6` y `generation.image.enabled: true`.
+
+### Setup y comandos principales
+
+Los requisitos son Node.js 20+, una cuenta de PixVerse y una subscription activa. Dentro de `remotion`, `pnpm install` instala también la PixVerse CLI fijada por el repo (`pixverse@^1.1.12`). El login se hace con `pixverse auth login`; el estado se revisa con `pixverse auth status` y `pixverse account info`.
+
+Los comandos principales son `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story` y `./bin/pipeline render`. Si la resolución de PATH del shell no es estable, usa `./bin/pipeline` antes que `pnpm pipeline:*`.
+
+### `project.yaml` y salida
+
+`project.yaml` contiene `project`, `speaker`, `locales`, `render` y `generation`. Dentro de `locales`, cada idioma define sus `clips`, y cada clip usa una fuente `generated`, `reference`, `video` o `image`.
+
+PixVerse usa `generation.prompt.base` / `generation.prompt.perRatio` como prompts de movimiento para el video compartido. El flujo por defecto es PixVerse I2I para crear una base still y luego I2V desde esa imagen. Los clips `source: reference` usan un `prompt` por corte y se generan con `pixverse create reference --images`.
+
+La salida queda agrupada en `output/<project-slug>/<run-id>/`, con `manifest.json` del batch, `manifest.render.json` por variant, el `character.mp4` final y los staging assets.
+
+### Integración con Michibiki
+
+Michibiki es una capa posterior de producción de video. Sirve para tomar los renders y manifests generados por PixVerse Character Pipeline y continuar con generación de proyectos, preview o reedición en Remotion, HyperFrames o Editframe.
+
+`export` crea para Michibiki `handoff.json`, `video-spec.json` y `video-specs/<lang>-<ratio>.json` por variant. Con `--run-michibiki` y `--michibiki-path`, este pipeline puede invocar la generación del proyecto en Michibiki, pero el preview y el render final siguen siendo pasos explícitos del lado de Michibiki.
+
+Si ya existe un resultado de `run` o `render` y quieres continuarlo en Michibiki, usa `--michibiki-handoff`. Un dry-run también puede generar handoff con rutas previstas, pero para edición real conviene usar un handoff posterior a un real `run` o local `render`, donde el MP4 referenciado ya exista.
+
+### Fixtures / Tests
+
+`fixtures/basic/project.yaml` sirve para smoke test de local render; `fixtures/generated/project.yaml`, para plan / dry-run con generated / video / image; `fixtures/reference-story/project.yaml`, para story con reference por corte; y `fixtures/legacy/spokesperson.yaml`, para compatibilidad legacy. Para verificar, entra en `remotion` y ejecuta `pnpm typecheck` y `pnpm test`.
+
 <a id="lang-fr"></a>
 
 ## Français
@@ -105,6 +340,53 @@ Crée des vidéos d'annonce en japonais et en anglais à partir de cette image d
 Utilise un décor de studio photoréaliste, en 16:9 et 9:16, puis prépare un handoff Michibiki.
 Montre-moi d'abord le plan dry-run.
 ```
+
+### Compatibilité avec les agents
+
+Ce dépôt est organisé pour fonctionner avec Claude Code et Codex. Le runtime ne dépend pas d'un outil particulier: les éléments centraux sont `project.yaml` et `remotion/./bin/pipeline`. Les fichiers `.claude/*` sont des aides locales facultatives, pas des prérequis d'exécution. `CLAUDE.md` et `AGENTS.md` décrivent le même workflow depuis chaque point d'entrée.
+
+### Ce que le pipeline fait
+
+- Transforme une image de personnage en talking character video intégré dans un environnement photoréaliste.
+- Traite des projets depuis `project.yaml` avec plusieurs langues et plusieurs formats d'image.
+- Mélange des clips `generated | reference | video | image` dans la même timeline.
+- Convertit les sorties PixVerse en `manifest.render.json` et en vidéos finales `character.mp4`.
+- Accepte l'ancien format `spokesperson.yaml` comme entrée compatible.
+- Prépare des fichiers de handoff Michibiki pour Remotion, HyperFrames ou Editframe.
+
+### Demande et déroulement
+
+Le point d'entrée est une demande en langage naturel, pas une commande. L'agent normalise la demande en `project.yaml`. S'il manque des informations, il demande brièvement le nom du projet, l'image du personnage, les langues cibles, la composition des clips, les formats d'image et la direction visuelle du décor.
+
+L'exécution commence par `validate`, puis `plan`, et utilise `run --dry-run` lorsqu'une revue préalable est souhaitée. Le vrai `run`, qui peut consommer des crédits PixVerse, nécessite une autorisation explicite. Pour les configs qui n'utilisent que des clips locaux `video` / `image`, utilisez `render`.
+
+Pour les demandes story / teaser / trailer, le comportement par défaut consiste à découper le concept en 3-5 beats et à écrire chaque beat comme clip `source: reference`. Pour un workflow standard avec image de personnage, les valeurs par défaut sont `speaker.mode: single`, `generation.model: v6`, `generation.referenceModel: v6` et `generation.image.enabled: true`.
+
+### Installation et commandes principales
+
+Les prérequis sont Node.js 20+, un compte PixVerse et une subscription active. Dans le dossier `remotion`, `pnpm install` installe aussi la PixVerse CLI fixée par le repo (`pixverse@^1.1.12`). La connexion se fait avec `pixverse auth login`; l'état se vérifie avec `pixverse auth status` et `pixverse account info`.
+
+Les commandes principales sont `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story` et `./bin/pipeline render`. Lorsque la résolution du PATH shell est instable, privilégiez `./bin/pipeline` plutôt que `pnpm pipeline:*`.
+
+### `project.yaml` et sorties
+
+`project.yaml` contient `project`, `speaker`, `locales`, `render` et `generation`. Dans `locales`, chaque langue définit ses `clips`; chaque clip utilise une source `generated`, `reference`, `video` ou `image`.
+
+PixVerse utilise `generation.prompt.base` / `generation.prompt.perRatio` comme prompts de mouvement vidéo. Le flux par défaut crée d'abord une base still avec PixVerse I2I, puis lance I2V depuis cette image. Les clips `source: reference` utilisent un `prompt` par cut et sont générés avec `pixverse create reference --images`.
+
+Les sorties sont regroupées sous `output/<project-slug>/<run-id>/`, avec le `manifest.json` du batch, un `manifest.render.json` par variant, le `character.mp4` final et les staging assets.
+
+### Intégration Michibiki
+
+Michibiki est une couche de production vidéo en aval. Elle sert à envoyer les source renders et manifests produits par PixVerse Character Pipeline vers la génération de projets, la prévisualisation ou la réédition dans Remotion, HyperFrames ou Editframe.
+
+`export` crée pour Michibiki `handoff.json`, `video-spec.json` et `video-specs/<lang>-<ratio>.json` pour chaque variant. Avec `--run-michibiki` et `--michibiki-path`, ce pipeline peut invoquer la génération de projet côté Michibiki, mais la preview et le final render restent des étapes explicites côté Michibiki.
+
+Pour continuer dans Michibiki à partir d'un résultat déjà produit par `run` ou `render`, utilisez `--michibiki-handoff`. Un dry-run peut aussi créer un handoff avec chemins prévus, mais pour une édition réelle il faut utiliser un handoff après un real `run` ou un local `render`, afin que le MP4 référencé existe déjà.
+
+### Fixtures / Tests
+
+`fixtures/basic/project.yaml` sert au smoke test de local render; `fixtures/generated/project.yaml`, au plan / dry-run avec generated / video / image; `fixtures/reference-story/project.yaml`, au story reference par cut; et `fixtures/legacy/spokesperson.yaml`, à la compatibilité legacy. Pour vérifier, entrez dans `remotion` puis exécutez `pnpm typecheck` et `pnpm test`.
 
 ## Agent Compatibility
 
