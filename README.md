@@ -1,18 +1,110 @@
 # PixVerse Character Pipeline
 
-[日本語](./README.ja.md) | English
+English | [日本語](#lang-ja) | [简体中文](#lang-zh) | [한국어](#lang-ko) | [Español](#lang-es) | [Français](#lang-fr)
 
-This repository is an agent-first pipeline for generating character videos. Rather than running CLI commands directly, you describe what you want in natural language, and the AI agent normalizes your request into `project.yaml`, then drives PixVerse and Remotion to produce the final MP4.
-All image and video generation paths documented in this repo are implemented through PixVerse CLI; Remotion is used for staging and the final render only.
+> Translations below are concise onboarding sections in this README. The detailed command reference continues in English after the language summaries.
 
-## Multilingual and Natural-Language First
+## English
 
-Use this repo by asking an AI agent for the result you want, in natural language. You do not need to start from CLI flags or YAML.
+This repository is an agent-first pipeline for generating character videos. Describe the video you want in natural language; the AI agent turns that request into `project.yaml`, then drives PixVerse and Remotion to produce the final MP4.
 
-- Documentation is available in English and Japanese.
-- A single request can target multiple video locales, such as Japanese and English, through `locales` in `project.yaml`.
+- This README includes six language entry points in one file.
+- One request can target multiple video locales, such as Japanese and English, through `locales` in `project.yaml`.
 - The agent should ask only for missing production choices, then run `validate`, `plan`, and optionally `run --dry-run` before any PixVerse credit-spending step.
 - Michibiki handoff / export can be requested in the same natural-language prompt when you want downstream editing, preview, or project generation.
+
+```text
+Create Japanese and English announcement videos from this character image.
+Use a photoreal studio background, 16:9 and 9:16, then prepare a Michibiki handoff.
+Show me the dry-run plan first.
+```
+
+All image and video generation paths documented in this repo are implemented through PixVerse CLI; Remotion is used for staging and the final render only.
+
+<a id="lang-ja"></a>
+
+## 日本語
+
+このリポジトリは、AI エージェントに自然言語で依頼してキャラクター動画を作るためのパイプラインです。作りたい動画を文章で伝えると、エージェントが `project.yaml` に正規化し、PixVerse と Remotion で最終 MP4 まで進めます。
+
+- 基本的な入口はこの README 内で 6 言語に切り替えられます。別 README へ移動する必要はありません。
+- `project.yaml` の `locales` で、日本語・英語など複数言語の動画を 1 つの依頼として扱えます。
+- エージェントは不足情報だけを確認し、PixVerse credit を使う前に `validate`、`plan`、必要に応じて `run --dry-run` を実行します。
+- Michibiki への handoff / export も、「Michibiki に渡したい」「Remotion や HyperFrames で続きから編集したい」と自然文で頼めます。
+
+```text
+このキャラ画像から、日本語版と英語版の案内動画を作って。
+実写っぽいスタジオ背景で、16:9 と 9:16 の両方。最後に Michibiki handoff も作って。
+まずは dry-run の計画だけ見せて。
+```
+
+<a id="lang-zh"></a>
+
+## 简体中文
+
+这个仓库是面向 AI Agent 的角色视频制作流水线。你只需要用自然语言描述想要的视频，Agent 会把请求整理成 `project.yaml`，再通过 PixVerse 和 Remotion 生成最终 MP4。
+
+- 基础入口在同一个 README 中支持 6 种语言切换。
+- 一个请求可以通过 `project.yaml` 里的 `locales` 同时生成多语言版本，例如日语和英语。
+- Agent 应只追问缺失的制作信息，并在消耗 PixVerse credits 之前执行 `validate`、`plan`，必要时执行 `run --dry-run`。
+- 如果需要后续编辑、预览或项目生成，也可以在同一个自然语言请求中要求 Michibiki handoff / export。
+
+```text
+请用这张角色图片制作日语和英语的公告视频。
+背景使用写实摄影棚风格，输出 16:9 和 9:16，并准备 Michibiki handoff。
+请先给我 dry-run 计划。
+```
+
+<a id="lang-ko"></a>
+
+## 한국어
+
+이 저장소는 AI 에이전트가 캐릭터 영상을 만들기 위한 파이프라인입니다. 원하는 결과를 자연어로 설명하면, 에이전트가 이를 `project.yaml`로 정리하고 PixVerse와 Remotion으로 최종 MP4를 만듭니다.
+
+- 기본 안내는 이 README 안에서 6개 언어로 전환해 볼 수 있습니다.
+- `project.yaml`의 `locales`를 통해 일본어와 영어처럼 여러 언어 버전을 한 번에 요청할 수 있습니다.
+- 에이전트는 부족한 정보만 확인하고, PixVerse 크레딧을 쓰기 전에 `validate`, `plan`, 필요 시 `run --dry-run`을 실행해야 합니다.
+- 이후 편집, 미리보기, 프로젝트 생성을 위해 Michibiki handoff / export도 같은 자연어 요청에 포함할 수 있습니다.
+
+```text
+이 캐릭터 이미지로 일본어와 영어 안내 영상을 만들어 주세요.
+실사풍 스튜디오 배경으로 16:9와 9:16을 만들고, Michibiki handoff도 준비해 주세요.
+먼저 dry-run 계획을 보여 주세요.
+```
+
+<a id="lang-es"></a>
+
+## Español
+
+Este repositorio es un pipeline pensado para trabajar con agentes de IA y crear videos de personajes. Describe el resultado en lenguaje natural; el agente lo convierte en `project.yaml` y usa PixVerse y Remotion para generar el MP4 final.
+
+- La entrada básica está en este mismo README en seis idiomas.
+- Una sola solicitud puede producir varias versiones de idioma, como japonés e inglés, mediante `locales` en `project.yaml`.
+- El agente debe pedir solo los datos faltantes y ejecutar `validate`, `plan` y, si hace falta, `run --dry-run` antes de gastar créditos de PixVerse.
+- También puedes pedir un handoff / export a Michibiki para seguir editando o previsualizando en Remotion, HyperFrames o Editframe.
+
+```text
+Crea videos de anuncio en japonés e inglés a partir de esta imagen de personaje.
+Usa un fondo de estudio fotorrealista, 16:9 y 9:16, y prepara un handoff para Michibiki.
+Primero muéstrame el plan dry-run.
+```
+
+<a id="lang-fr"></a>
+
+## Français
+
+Ce dépôt est un pipeline conçu pour les agents IA afin de créer des vidéos de personnages. Décrivez le résultat souhaité en langage naturel; l'agent le transforme en `project.yaml`, puis utilise PixVerse et Remotion pour produire le MP4 final.
+
+- L'entrée de base est disponible dans ce README en six langues.
+- Une seule demande peut cibler plusieurs langues de sortie, par exemple japonais et anglais, via `locales` dans `project.yaml`.
+- L'agent doit demander uniquement les informations manquantes, puis exécuter `validate`, `plan` et éventuellement `run --dry-run` avant toute dépense de crédits PixVerse.
+- Vous pouvez aussi demander un handoff / export Michibiki pour continuer le montage, la prévisualisation ou la génération de projet avec Remotion, HyperFrames ou Editframe.
+
+```text
+Crée des vidéos d'annonce en japonais et en anglais à partir de cette image de personnage.
+Utilise un décor de studio photoréaliste, en 16:9 et 9:16, puis prépare un handoff Michibiki.
+Montre-moi d'abord le plan dry-run.
+```
 
 ## Agent Compatibility
 
