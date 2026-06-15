@@ -1,9 +1,18 @@
 # PixVerse Character Pipeline
 
-[日本語](./README.ja.md)
+[日本語](./README.ja.md) | English
 
 This repository is an agent-first pipeline for generating character videos. Rather than running CLI commands directly, you describe what you want in natural language, and the AI agent normalizes your request into `project.yaml`, then drives PixVerse and Remotion to produce the final MP4.
 All image and video generation paths documented in this repo are implemented through PixVerse CLI; Remotion is used for staging and the final render only.
+
+## Multilingual and Natural-Language First
+
+Use this repo by asking an AI agent for the result you want, in natural language. You do not need to start from CLI flags or YAML.
+
+- Documentation is available in English and Japanese.
+- A single request can target multiple video locales, such as Japanese and English, through `locales` in `project.yaml`.
+- The agent should ask only for missing production choices, then run `validate`, `plan`, and optionally `run --dry-run` before any PixVerse credit-spending step.
+- Michibiki handoff / export can be requested in the same natural-language prompt when you want downstream editing, preview, or project generation.
 
 ## Agent Compatibility
 
@@ -21,6 +30,7 @@ This repo is meant to work with both Claude Code and Codex.
 - Mix `generated | reference | video | image` clips in the same timeline
 - Turn PixVerse outputs into `manifest.render.json` files and final `character.mp4` renders
 - Accept legacy `spokesperson.yaml` as a backward-compatible input format
+- Prepare optional Michibiki handoff files for Remotion, HyperFrames, or Editframe workflows
 
 ## How to Ask the Agent
 
@@ -46,6 +56,11 @@ Urban office-style photoreal background.
 ```text
 Reference this character first, then build a 4-cut shrine-at-night story teaser.
 Make each cut a different scene, then add BGM and captions in the final render.
+```
+
+```text
+Create Japanese and English versions, then prepare a Michibiki handoff.
+I want to continue editing the generated video as a HyperFrames or Remotion project.
 ```
 
 If information is missing, the agent will ask follow-up questions in this order:
@@ -237,6 +252,8 @@ output/<project-slug>/<run-id>/
 Remotion staging assets are generated automatically under `remotion/public/.pipeline/`.
 
 ## Optional Michibiki Export / Handoff
+
+Michibiki is an optional downstream video-production layer. Use it when PixVerse Character Pipeline should produce the character-video source, then hand that result to another engine route such as Remotion, HyperFrames, or Editframe for editing, previewing, or repurposing.
 
 Use `export` when Remotion, HyperFrames, or Editframe project generation should happen in [Michibiki](https://github.com/Takamasa045/michibiki), similar to the PixVerse Shotpack handoff.
 

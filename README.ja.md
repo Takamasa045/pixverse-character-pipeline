@@ -1,10 +1,19 @@
 # PixVerse Character Pipeline
 
-[English](./README.md)
+[English](./README.md) | 日本語
 
 このリポジトリは、CLI を人が直接叩くための説明書というより、AI エージェントに自然言語で依頼して使うためのパイプラインです。  
 ユーザーは「何を作りたいか」を自然文で伝え、エージェントはそれを `project.yaml` に正規化し、PixVerse と Remotion で最終動画まで実行します。  
 この repo で案内している画像生成・動画生成の標準フローはすべて PixVerse CLI ベースで、Remotion は staging と最終 render にのみ使います。
+
+## 多言語対応と自然言語での使い方
+
+この repo の入口は、コマンドや YAML ではなく「こういう動画を作りたい」という自然文の依頼です。
+
+- README は英語版と日本語版を用意しています。
+- 生成動画は `project.yaml` の `locales` で、日本語・英語など複数言語を 1 つの案件として扱えます。
+- ユーザーは日本語でも英語でも依頼できます。エージェントは不足情報だけを短く確認し、`validate`、`plan`、必要に応じて `run --dry-run` まで進めます。
+- Michibiki への handoff / export も、同じ自然文の中で「Michibiki に渡したい」「HyperFrames や Remotion 側で編集したい」と頼めます。
 
 ## Agent Compatibility
 
@@ -41,6 +50,11 @@ BGM は assets/bgm.mp3 を使ってください。
 ```text
 このキャラをリファレンスしてから、神社の夜を舞台に4カットの短いストーリー動画を作って。
 各カットは別シーンにして、最後にBGMとテロップを入れて。
+```
+
+```text
+日本語版と英語版を作って、最後に Michibiki へ渡せる handoff も作って。
+HyperFrames か Remotion の編集 project として続きから触れるようにしたい。
 ```
 
 ```text
@@ -266,6 +280,8 @@ output/<project-slug>/<run-id>/
 Remotion 用の staging は `remotion/public/.pipeline/` に自動生成されます。
 
 ## Michibiki への任意 export / handoff
+
+Michibiki は、この pipeline の後段に置ける動画制作レイヤーです。PixVerse Character Pipeline でキャラクター動画の素材・render・manifest を作り、その結果を Remotion / HyperFrames / Editframe などの project 生成、preview、再編集へ渡したいときに使います。
 
 Remotion / HyperFrames / Editframe などの動画 project 生成を [Michibiki](https://github.com/Takamasa045/michibiki) 側に任せたい場合は、PixVerse Shotpack と同じように `export` を使います。
 
