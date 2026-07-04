@@ -26,6 +26,74 @@ Follow-up:
 - ...
 ```
 
+## 2026-07-04 - Upgrade runtime wrappers to PixVerse CLI 1.2.x
+
+Status: accepted
+
+Decision:
+
+- Pin the repo-local PixVerse CLI to `pixverse@^1.2.7`.
+- Replace the removed `create speech` runtime path with `create voice` audio assets layered through Remotion `narrationSrc`.
+- Add `voiceId` as the PixVerse preset voice field; keep legacy `ttsSpeaker` / `tts_speaker` loading only for backward-compatible config parsing.
+- Keep `speechJobs` as a legacy plan alias while adding `voiceJobs` for the current CLI terminology.
+
+Reason:
+
+- PixVerse CLI `1.2.0` removed `create speech` and added `create voice` / `create music`.
+- Treating old numeric `ttsSpeaker` values as `--voice-id` would be unsafe because CLI 1.2 voice IDs are PixVerse preset IDs.
+- Separate audio assets fit the pipeline's Remotion timeline and avoid mutating generated video clips for narration.
+
+Impacted files:
+
+- `remotion/package.json`
+- `remotion/pnpm-lock.yaml`
+- `remotion/src/lib/pixverse.ts`
+- `remotion/src/lib/pipeline.ts`
+- `remotion/src/lib/config.ts`
+- `remotion/src/lib/manifest.ts`
+- `remotion/src/lib/planner.ts`
+- `README.md`
+- `README.ja.md`
+- `SKILL.md`
+- `references/model-support.md`
+- `references/pixverse-best-practices.md`
+
+Follow-up:
+
+- Add direct pipeline support for `create music` only if config-level BGM generation becomes a real requirement.
+
+## 2026-07-04 - Focus production routing on PixVerse CLI
+
+Status: accepted
+
+Decision:
+
+- Add a CLI production routing layer that chooses PixVerse command family, model candidates, batch pattern, post-process steps, audio steps, and QC before prompt writing.
+- Keep `references/model-support.md` as the only model table.
+- Remove Canvas / Mini Apps from the repo-local best-practice surface for now.
+- Add reusable templates for brief, shotlist, CLI batch plan, generation plan, QC report, and accepted-output post package.
+
+Reason:
+
+- The repo should be a PixVerse CLI production operation workspace, not only a prompt collection.
+- Existing defaults still matter: normal character-image workflows stay `single` -> I2I -> V6, while story / teaser / trailer uses per-cut reference clips.
+- Public OSS docs must avoid private run logs, account state, campaign data, and raw generated output.
+
+Impacted files:
+
+- `references/model-routing.md`
+- `references/pixverse-best-practices.md`
+- `agents/pixverse-production-agents.md`
+- `templates/*`
+- `README.md`
+- `README.ja.md`
+- `SKILL.md`
+- `LOOPS.md`
+
+Follow-up:
+
+- Refresh `references/model-support.md` separately when doing a PixVerse CLI compatibility pass.
+
 ## 2026-06-15 - Add optional Michibiki export and handoff
 
 Status: accepted
@@ -195,6 +263,29 @@ Follow-up:
 
 - Keep `references/model-support.md` current as PixVerse model support changes.
 
+## 2026-06-26 - Visible character clips require reference-match QA
+
+Status: accepted
+
+Decision:
+
+- Any generated or reference clip with a visible character must be compared against the source reference image before acceptance.
+- Character identity is a hard gate: if age, body type, hair, outfit, face, or key props drift into a different person, the clip fails even when action, setting, or story causality is correct.
+- Reviews for visible-character clips should record the reference-match criteria that passed and any accepted minor differences.
+
+Reason:
+
+- A Yamamba spray-shot revision fixed spray causality but drifted from the small vine-haired reference character into a different adult woman.
+- Action continuity alone is not enough for character-video quality.
+
+Impacted files:
+
+- `CHECKS.md`
+
+Follow-up:
+
+- Regenerate the Yamamba spray cut and accept it only after side-by-side reference QC.
+
 ## 2026-06-06 - Use `source: reference` for story / teaser / trailer
 
 Status: accepted
@@ -231,7 +322,7 @@ Decision:
 
 - Do not call PixVerse `create sound`.
 - Use `generation.generateAudio` to map to `--audio` or `--no-audio` on supported generation commands.
-- Use `create speech` or `audioFile` for narration.
+- Use `create voice` or `audioFile` for narration.
 
 Reason:
 

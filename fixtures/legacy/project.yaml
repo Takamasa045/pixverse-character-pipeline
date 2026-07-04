@@ -21,7 +21,6 @@ locales:
       - id: primary
         source: generated
         text: これは互換性テスト用の原稿です。
-        ttsSpeaker: 1
         durationSeconds: 5
         overlayText: ""
         overlayStyle: none

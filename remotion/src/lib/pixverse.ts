@@ -12,7 +12,7 @@ import type {
   SupportedAspectRatio,
 } from "./types";
 
-type PixverseAssetType = "image" | "video";
+type PixverseAssetType = "audio" | "image" | "video";
 type PixverseCreateOptions = {
   idempotencyScope?: string;
 };
@@ -58,6 +58,7 @@ const extractTaskId = (payload: Record<string, unknown>): string => {
   const value =
     payload.video_id ??
     payload.image_id ??
+    payload.audio_id ??
     payload.asset_id ??
     payload.task_id ??
     payload.id;
@@ -341,30 +342,26 @@ export const waitForTask = async (
   await runPixverse(["task", "wait", assetId, "--type", assetType]);
 };
 
-export const createSpeech = async (
-  baseVideoId: string,
+export const createVoice = async (
   clip: GeneratedClipConfig | ReferenceClipConfig,
   options?: PixverseCreateOptions,
 ): Promise<string> => {
-  const payload = await runPixverse(buildCreateSpeechArgs(baseVideoId, clip, options));
+  const payload = await runPixverse(buildCreateVoiceArgs(clip, options));
   return extractTaskId(payload);
 };
 
-export const buildCreateSpeechArgs = (
-  baseVideoId: string,
+export const buildCreateVoiceArgs = (
   clip: GeneratedClipConfig | ReferenceClipConfig,
   options?: PixverseCreateOptions,
 ): string[] => {
-  const args = ["create", "speech", "--video", baseVideoId];
-
-  if (clip.audioFile) {
-    args.push("--audio", clip.audioFile);
-  } else if (clip.text) {
-    args.push("--tts-text", clip.text, "--tts-speaker", String(clip.ttsSpeaker ?? 1));
-  } else {
-    throw new Error(`Generated clip ${clip.id} requires text or audioFile.`);
+  if (!clip.text) {
+    throw new Error(`Clip ${clip.id} requires text for PixVerse create voice.`);
   }
 
+  const args = ["create", "voice", "--text", clip.text];
+  if (clip.voiceId) {
+    args.push("--voice-id", clip.voiceId);
+  }
   args.push("--no-wait");
 
   return withIdempotencyKey(args, options);

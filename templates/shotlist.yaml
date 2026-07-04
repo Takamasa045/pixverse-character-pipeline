@@ -1,0 +1,50 @@
+project:
+  title:
+  purpose:
+  platform:
+  aspect_ratio:
+  total_duration_seconds:
+
+workflow:
+  command_family:
+  model_candidate:
+    - v6
+  fallback:
+  notes:
+
+shots:
+  - id: shot-01
+    role: hook
+    duration_seconds: 4
+    source: reference
+    cli_command: create reference
+    model_candidate: v6
+    visual_goal:
+    character_action:
+    background_motion:
+    camera_work:
+    narration:
+    overlay_text:
+    consistency_rules:
+      - Keep the same character identity.
+    qc_focus:
+      - character
+      - motion
+
+  - id: shot-02
+    role: reveal
+    duration_seconds: 4
+    source: reference
+    cli_command: create reference
+    model_candidate: v6
+    visual_goal:
+    character_action:
+    background_motion:
+    camera_work:
+    narration:
+    overlay_text:
+    consistency_rules:
+      - Keep key props stable.
+    qc_focus:
+      - prop
+      - story

@@ -66,13 +66,13 @@ export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
     ),
   );
 
-  const speechJobs = Object.values(loaded.config.locales).reduce(
+  const voiceJobs = Object.values(loaded.config.locales).reduce(
     (sum, locale) =>
       sum +
       locale.clips.filter(
         (clip) =>
           (clip.source === "generated" || clip.source === "reference") &&
-          Boolean(clip.text || clip.audioFile),
+          Boolean(clip.text && !clip.audioFile),
       ).length *
         loaded.config.render.aspectRatios.length,
     0,
@@ -103,12 +103,13 @@ export const buildPipelinePlan = (loaded: LoadedConfig): PipelinePlan => {
       audioJobs,
       referenceJobs: referenceJobs.length,
       soundJobs,
-      speechJobs,
+      voiceJobs,
+      speechJobs: voiceJobs,
       totalJobs:
         imageJobs.length +
         baseJobs.length +
         referenceJobs.length +
-        speechJobs +
+        voiceJobs +
         soundJobs +
         upscaleJobs,
       upscaleJobs,

@@ -1,4 +1,14 @@
-export type OverlayStyle = "title" | "subtitle" | "lower-third" | "endcard" | "none";
+export type OverlayStyle =
+  | "title"
+  | "subtitle"
+  | "lower-third"
+  | "endcard"
+  | "title-story"
+  | "story-top"
+  | "story-bottom"
+  | "quote"
+  | "warning"
+  | "none";
 
 export type SupportedAspectRatio =
   | "16:9"
@@ -38,6 +48,8 @@ export type GeneratedClipConfig = {
   overlayText?: string;
   source: "generated";
   text?: string;
+  voiceId?: string | null;
+  /** Legacy numeric TTS speaker setting. Prefer voiceId for CLI 1.2+. */
   ttsSpeaker?: number | null;
 };
 
@@ -52,6 +64,8 @@ export type ReferenceClipConfig = {
   prompt: string;
   source: "reference";
   text?: string;
+  voiceId?: string | null;
+  /** Legacy numeric TTS speaker setting. Prefer voiceId for CLI 1.2+. */
   ttsSpeaker?: number | null;
 };
 
@@ -217,6 +231,7 @@ export type PipelinePlan = {
     imageJobs: number;
     audioJobs: number;
     soundJobs: number;
+    voiceJobs: number;
     speechJobs: number;
     totalJobs: number;
     upscaleJobs: number;

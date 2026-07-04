@@ -10,7 +10,7 @@ import {
   createBaseImage,
   createBaseVideo,
   createReferenceVideo,
-  createSpeech,
+  createVoice,
   createUpscale,
   downloadAsset,
   getAvailableCredits,
@@ -32,6 +32,7 @@ import type {
 } from "./types";
 
 const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
+const AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac", ".ogg"];
 const VIDEO_EXTENSIONS = [".mp4"];
 
 type ExecutePipelineOptions = {
@@ -129,8 +130,89 @@ const isSelectedVariant = (
   return true;
 };
 
-const clipNeedsSpeech = (clip: GeneratedClipConfig | ReferenceClipConfig): boolean =>
+const clipNeedsNarration = (clip: GeneratedClipConfig | ReferenceClipConfig): boolean =>
   Boolean(clip.text || clip.audioFile);
+
+const prepareNarrationAsset = async ({
+  aspectRatio,
+  clip,
+  dryRun,
+  language,
+  outputAssetsDir,
+  runId,
+  stageAssetsDir,
+  projectSlug,
+}: {
+  aspectRatio: SupportedAspectRatio;
+  clip: GeneratedClipConfig | ReferenceClipConfig;
+  dryRun: boolean;
+  language: string;
+  outputAssetsDir: string;
+  runId: string;
+  stageAssetsDir: string;
+  projectSlug: string;
+}): Promise<{ outputPath: string; publicPath: string; voiceId: string | null } | null> => {
+  if (!clipNeedsNarration(clip)) {
+    return null;
+  }
+
+  const targetName = clip.audioFile
+    ? clipTargetName(`${clip.id}-narration`, clip.audioFile, ".mp3")
+    : `${clip.id}-narration.mp3`;
+
+  if (dryRun) {
+    return {
+      ...reserveVariantPath(outputAssetsDir, stageAssetsDir, targetName),
+      voiceId: null,
+    };
+  }
+
+  if (clip.audioFile) {
+    return {
+      ...(await copyIntoVariant(clip.audioFile, outputAssetsDir, stageAssetsDir, targetName)),
+      voiceId: null,
+    };
+  }
+
+  const voiceId = await createVoice(clip, {
+    idempotencyScope: idempotencyScope({
+      aspectRatio,
+      clipId: clip.id,
+      language,
+      projectSlug,
+      runId,
+      stage: "voice",
+    }),
+  });
+  await waitForTask(voiceId, "audio");
+
+  const tempDownloadDir = resolve(
+    outputAssetsDir,
+    ".downloads",
+    ratioToSlug(aspectRatio),
+    `${clip.id}-narration`,
+  );
+  await rm(tempDownloadDir, { force: true, recursive: true });
+
+  const downloadedPath = await downloadAsset(voiceId, tempDownloadDir, {
+    assetType: "audio",
+    extensions: AUDIO_EXTENSIONS,
+  });
+  const outputPath = resolve(outputAssetsDir, targetName);
+  await mkdir(outputAssetsDir, { recursive: true });
+  await rename(downloadedPath, outputPath);
+
+  const stagePath = resolve(stageAssetsDir, targetName);
+  await mkdir(stageAssetsDir, { recursive: true });
+  await copyFile(outputPath, stagePath);
+  await rm(tempDownloadDir, { force: true, recursive: true });
+
+  return {
+    outputPath,
+    publicPath: relativeToPublic(stagePath),
+    voiceId,
+  };
+};
 
 const idempotencyScope = ({
   aspectRatio,
@@ -176,12 +258,28 @@ const prepareGeneratedClip = async ({
   outputAssetsDir: string;
   runId: string;
   stageAssetsDir: string;
-}): Promise<{ outputPath: string; publicPath: string; stageIds: ClipStageIds }> => {
+}): Promise<{
+  narrationPublicPath: string | null;
+  outputPath: string;
+  publicPath: string;
+  stageIds: ClipStageIds;
+}> => {
   const targetName = clipTargetName(clip.id, null, ".mp4");
+  const narrationAsset = await prepareNarrationAsset({
+    aspectRatio,
+    clip,
+    dryRun,
+    language,
+    outputAssetsDir,
+    projectSlug: config.project.slug,
+    runId,
+    stageAssetsDir,
+  });
 
   if (dryRun) {
     const reserved = reserveVariantPath(outputAssetsDir, stageAssetsDir, targetName);
     return {
+      narrationPublicPath: narrationAsset?.publicPath ?? null,
       outputPath: reserved.outputPath,
       publicPath: reserved.publicPath,
       stageIds: { final: null, sound: null, speech: null, upscale: null },
@@ -189,23 +287,7 @@ const prepareGeneratedClip = async ({
   }
 
   let latestId = baseVideoId;
-  let speechId: string | null = null;
   let upscaleId: string | null = null;
-
-  if (clipNeedsSpeech(clip)) {
-    speechId = await createSpeech(baseVideoId, clip, {
-      idempotencyScope: idempotencyScope({
-        aspectRatio,
-        clipId: clip.id,
-        language,
-        projectSlug: config.project.slug,
-        runId,
-        stage: "speech",
-      }),
-    });
-    await waitForTask(speechId);
-    latestId = speechId;
-  }
 
   if (config.generation.upscale) {
     upscaleId = await createUpscale(latestId, config.generation.quality, {
@@ -239,12 +321,13 @@ const prepareGeneratedClip = async ({
   await rm(tempDownloadDir, { force: true, recursive: true });
 
   return {
+    narrationPublicPath: narrationAsset?.publicPath ?? null,
     outputPath,
     publicPath: relativeToPublic(stagePath),
     stageIds: {
       final: latestId,
       sound: null,
-      speech: speechId,
+      speech: narrationAsset?.voiceId ?? null,
       upscale: upscaleId,
     },
   };
@@ -268,12 +351,28 @@ const prepareReferenceClip = async ({
   outputAssetsDir: string;
   runId: string;
   stageAssetsDir: string;
-}): Promise<{ outputPath: string; publicPath: string; stageIds: ClipStageIds }> => {
+}): Promise<{
+  narrationPublicPath: string | null;
+  outputPath: string;
+  publicPath: string;
+  stageIds: ClipStageIds;
+}> => {
   const targetName = clipTargetName(clip.id, null, ".mp4");
+  const narrationAsset = await prepareNarrationAsset({
+    aspectRatio,
+    clip,
+    dryRun,
+    language,
+    outputAssetsDir,
+    projectSlug: config.project.slug,
+    runId,
+    stageAssetsDir,
+  });
 
   if (dryRun) {
     const reserved = reserveVariantPath(outputAssetsDir, stageAssetsDir, targetName);
     return {
+      narrationPublicPath: narrationAsset?.publicPath ?? null,
       outputPath: reserved.outputPath,
       publicPath: reserved.publicPath,
       stageIds: { final: null, sound: null, speech: null, upscale: null },
@@ -296,23 +395,7 @@ const prepareReferenceClip = async ({
   await waitForTask(baseVideoId);
 
   let latestId = baseVideoId;
-  let speechId: string | null = null;
   let upscaleId: string | null = null;
-
-  if (clipNeedsSpeech(clip)) {
-    speechId = await createSpeech(latestId, clip, {
-      idempotencyScope: idempotencyScope({
-        aspectRatio,
-        clipId: clip.id,
-        language,
-        projectSlug: config.project.slug,
-        runId,
-        stage: "speech",
-      }),
-    });
-    await waitForTask(speechId);
-    latestId = speechId;
-  }
 
   if (config.generation.upscale) {
     upscaleId = await createUpscale(latestId, config.generation.quality, {
@@ -346,12 +429,13 @@ const prepareReferenceClip = async ({
   await rm(tempDownloadDir, { force: true, recursive: true });
 
   return {
+    narrationPublicPath: narrationAsset?.publicPath ?? null,
     outputPath,
     publicPath: relativeToPublic(stagePath),
     stageIds: {
       final: latestId,
       sound: null,
-      speech: speechId,
+      speech: narrationAsset?.voiceId ?? null,
       upscale: upscaleId,
     },
   };
@@ -389,6 +473,7 @@ const executeVariant = async ({
   const stageAssetsDir = resolve(variantStageDir, "assets");
   const usesGeneratedClips = locale.clips.some((clip) => clip.source === "generated");
   const clipAssetPublicPaths: Record<string, string> = {};
+  const clipNarrationPublicPaths: Record<string, string> = {};
   const clipAssets: Record<string, string> = {};
   const clipVideoIds: Record<string, ClipStageIds> = {};
 
@@ -437,6 +522,9 @@ const executeVariant = async ({
       });
 
       clipAssetPublicPaths[clip.id] = generated.publicPath;
+      if (generated.narrationPublicPath) {
+        clipNarrationPublicPaths[clip.id] = generated.narrationPublicPath;
+      }
       clipAssets[clip.id] = toPosix(relative(runRoot, generated.outputPath));
       clipVideoIds[clip.id] = generated.stageIds;
       continue;
@@ -455,6 +543,9 @@ const executeVariant = async ({
       });
 
       clipAssetPublicPaths[clip.id] = generated.publicPath;
+      if (generated.narrationPublicPath) {
+        clipNarrationPublicPaths[clip.id] = generated.narrationPublicPath;
+      }
       clipAssets[clip.id] = toPosix(relative(runRoot, generated.outputPath));
       clipVideoIds[clip.id] = generated.stageIds;
       continue;
@@ -479,6 +570,7 @@ const executeVariant = async ({
     assets: {
       bgmPublicPath: bgmAsset?.publicPath ?? null,
       clipAssetPublicPaths,
+      clipNarrationPublicPaths,
       speakerImagePublicPath: speakerImage.publicPath,
     },
     config: config.config,

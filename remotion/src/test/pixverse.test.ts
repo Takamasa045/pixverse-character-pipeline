@@ -5,7 +5,7 @@ import { loadProjectConfig } from "../lib/config";
 import {
   buildCreateBaseImageArgs,
   buildCreateBaseVideoArgs,
-  buildCreateSpeechArgs,
+  buildCreateVoiceArgs,
   buildIdempotencyKey,
   buildCreateReferenceVideoArgs,
   buildCreateUpscaleArgs,
@@ -108,10 +108,23 @@ test("PixVerse create arg builders add stable idempotency keys when scoped", asy
     throw new Error("generated fixture did not load a generated clip.");
   }
 
-  const speechArgs = buildCreateSpeechArgs("video-123", firstClip, {
-    idempotencyScope: "mixed-generated:retry-safe:en:16x9:intro:speech",
+  const voiceArgs = buildCreateVoiceArgs(firstClip, {
+    idempotencyScope: "mixed-generated:retry-safe:en:16x9:intro:voice",
   });
-  assert.equal(speechArgs.includes("--idempotency-key"), true);
+  assert.equal(voiceArgs.includes("--idempotency-key"), true);
+  assert.equal(valueAfter(voiceArgs, "--text"), firstClip.text);
+  assert.equal(valueAfter(voiceArgs, "--voice-id"), undefined);
+
+  const presetVoiceArgs = buildCreateVoiceArgs(
+    {
+      ...firstClip,
+      voiceId: "preset-voice-123",
+    },
+    {
+      idempotencyScope: "mixed-generated:retry-safe:en:16x9:intro:preset-voice",
+    },
+  );
+  assert.equal(valueAfter(presetVoiceArgs, "--voice-id"), "preset-voice-123");
 
   const upscaleArgs = buildCreateUpscaleArgs("video-123", "720p", {
     idempotencyScope: "mixed-generated:retry-safe:en:16x9:intro:upscale",

@@ -37,8 +37,8 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.14)
       pixverse:
-        specifier: ^1.1.12
-        version: 1.1.12
+        specifier: ^1.2.7
+        version: 1.2.7
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -1323,8 +1323,8 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  pixverse@1.1.12:
-    resolution: {integrity: sha512-En4HUSNdF2k73jCktKeyGRGeMKXNVl1jIHlu3EsdbVQM0VujQSj2YZJwA9jtm7bDTuP/l+k32SmwLJu9K1Jk1w==}
+  pixverse@1.2.7:
+    resolution: {integrity: sha512-SHLDl13ngCwkNDhihRdvSLvMDvXcl5uy+2gW47GlC+BoBh70wV38F/nJgXSl53aTqeE05ZLp6WiOFJhr0IMGBg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -2030,14 +2030,14 @@ snapshots:
       '@remotion/media-parser': 4.0.373
       '@remotion/studio': 4.0.373(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@remotion/studio-shared': 4.0.373(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      css-loader: 5.2.7(webpack@5.96.1)
+      css-loader: 5.2.7(webpack@5.96.1(esbuild@0.25.0))
       esbuild: 0.25.0
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       react-refresh: 0.9.0
       remotion: 4.0.373(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       source-map: 0.7.3
-      style-loader: 4.0.0(webpack@5.96.1)
+      style-loader: 4.0.0(webpack@5.96.1(esbuild@0.25.0))
       webpack: 5.96.1(esbuild@0.25.0)
     transitivePeerDependencies:
       - '@swc/core'
@@ -2462,7 +2462,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  css-loader@5.2.7(webpack@5.96.1):
+  css-loader@5.2.7(webpack@5.96.1(esbuild@0.25.0)):
     dependencies:
       icss-utils: 5.1.0(postcss@8.5.8)
       loader-utils: 2.0.4
@@ -2901,7 +2901,7 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  pixverse@1.1.12:
+  pixverse@1.2.7:
     dependencies:
       '@clack/prompts': 1.5.1
       ali-oss: 6.23.0
@@ -3151,7 +3151,7 @@ snapshots:
 
   stubborn-utils@1.0.2: {}
 
-  style-loader@4.0.0(webpack@5.96.1):
+  style-loader@4.0.0(webpack@5.96.1(esbuild@0.25.0)):
     dependencies:
       webpack: 5.96.1(esbuild@0.25.0)
 
@@ -3163,7 +3163,7 @@ snapshots:
 
   tapable@2.3.0: {}
 
-  terser-webpack-plugin@5.4.0(esbuild@0.25.0)(webpack@5.96.1):
+  terser-webpack-plugin@5.4.0(esbuild@0.25.0)(webpack@5.96.1(esbuild@0.25.0)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
@@ -3289,7 +3289,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 3.3.0
       tapable: 2.3.0
-      terser-webpack-plugin: 5.4.0(esbuild@0.25.0)(webpack@5.96.1)
+      terser-webpack-plugin: 5.4.0(esbuild@0.25.0)(webpack@5.96.1(esbuild@0.25.0))
       watchpack: 2.5.1
       webpack-sources: 3.3.4
     transitivePeerDependencies:

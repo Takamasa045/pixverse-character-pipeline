@@ -17,7 +17,7 @@ pnpm install
 pixverse auth login
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.2.7`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
 
 ## Request Router
 
@@ -36,7 +36,7 @@ pixverse auth login
 
 ## Clip Modes
 
-- `generated`: shared I2V pipeline. Can use PixVerse TTS, `audioFile`, or be silent.
+- `generated`: shared I2V pipeline. Can create PixVerse voice audio from `text`, use `audioFile`, or be silent.
 - `reference`: per-cut PixVerse reference generation for story / teaser / trailer workflows. Uses `generation.referenceModel` (`v6` by default; `pixverse-c1` is still a valid override).
 - `video` / `image`: local assets only.
 
@@ -44,7 +44,7 @@ pixverse auth login
 
 - Safe to run before approval: `validate`, `plan`, `run --dry-run`, and local-only `render`.
 - Requires explicit user approval: `run` without `--dry-run`, because it can submit PixVerse jobs and consume credits.
-- Before batch generation, report planned variants, image/base/reference/speech/upscale job counts, and any obvious credit or slot risk.
+- Before batch generation, report planned variants, image/base/reference/voice/upscale job counts, and any obvious credit or slot risk.
 - Full `run` passes deterministic PixVerse `--idempotency-key` values scoped by project/run-id/variant/stage to reduce duplicate credit spend on retries.
 
 ## Recommended Sub-Agent Split
@@ -63,7 +63,7 @@ pixverse auth login
 - Only one agent edits `project.yaml`.
 - Only one agent runs the final PixVerse mutation step for a given config or `run-id`.
 - Parallel workers should stay read-only or dry-run-only unless the coordinator explicitly hands off ownership.
-- Do not assume ElevenLabs. Speech comes from PixVerse `create speech` or from `audioFile`.
+- Do not assume ElevenLabs. Narration comes from PixVerse `create voice` audio assets or from `audioFile`.
 
 ## Final Report Template
 

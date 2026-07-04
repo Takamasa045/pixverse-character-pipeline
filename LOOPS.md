@@ -403,3 +403,57 @@ Status:
 
 - どの出力を採用するか。
 - 生成し直すか、docs 改善で済むか。
+
+## Loop 9: PixVerse CLI Production Routing
+
+用途:
+
+- プロンプト集ではなく、目的、CLI command family、モデル候補、QC、再生成判断までを決める。
+- `create video` / `create image` / `create reference` / `motion-control` / `transition` / `modify` / `extend` / `upscale` / `voice` / `music` / batch を使い分ける。
+
+入力:
+
+- user request
+- character / product / environment references
+- target platform
+- desired output type
+- public-safe constraints
+
+読むファイル:
+
+- `references/model-routing.md`
+- `references/pixverse-best-practices.md`
+- `references/model-support.md`
+- `agents/pixverse-production-agents.md`
+- `CHECKS.md`
+
+手順:
+
+1. 目的を T2V / I2V / image / reference / motion-control / transition / modify / post-process / audio / batch / local render に分類する。
+2. Model Router が primary command family と fallback command family を選ぶ。
+3. 必要なら `templates/brief.md`、`templates/shotlist.yaml`、`templates/cli-batch-plan.md` を作る。
+4. pipeline で扱う場合だけ `project.yaml` に落とす。
+5. `validate` と `plan` で job count と credit risk を確認する。
+6. full `run` は明示承認後にだけ進める。
+7. 生成後は `references/final-video-qa-gate.md` と `templates/qc-report.md` で採用判断を分ける。
+8. QA を通った場合だけ post package や downstream edit に進む。
+
+出力:
+
+- command family / model routing summary
+- optional brief / shotlist / CLI batch plan
+- optional `project.yaml`
+- job count and risk summary
+- QC report
+- optional accepted-output package
+
+完了条件:
+
+- なぜその command family と model candidate を選んだか説明できる。
+- 直接 PixVerse CLI を使う場合も credit boundary と QA gate が明確。
+- PixVerse credit を使う前に approval boundary が明確。
+
+人間確認:
+
+- 生成 credit を使ってよいか。
+- どの出力を採用し、どれを再生成するか。

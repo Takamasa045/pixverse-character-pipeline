@@ -20,7 +20,6 @@ locales:
         source: reference
         prompt: A mysterious guide steps out into a moonlit shrine courtyard, cloth swaying softly, subtle purple light in the fog, slow push in, vertical portrait framing.
         text: A presence awakens in the shrine.
-        ttsSpeaker: 1
         durationSeconds: 3
         overlayText: A presence awakens
         overlayStyle: subtitle

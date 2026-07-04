@@ -166,3 +166,22 @@ Why:
 Done when:
 
 - Either `CONTRIBUTING.md` is added, or README explains that `AGENTS.md` / `CHECKS.md` are the current contributor workflow.
+
+### 10. Upgrade runtime wrappers to PixVerse CLI 1.2.x
+
+Status: done
+
+Owner: agent
+
+Observation:
+
+- `references/model-support.md` documents `pixverse@1.2.7`.
+- The repo-pinned local CLI is now `pixverse@^1.2.7`.
+- Runtime narration now uses `create voice` audio assets instead of the removed `create speech` command.
+- `create music` is documented for direct CLI production, but config-level BGM generation is not automated yet.
+
+Done when:
+
+- Loop 5 in `LOOPS.md` has been run.
+- Runtime code and tests support CLI `1.2.x`.
+- Decision is recorded in `DECISIONS.md`.

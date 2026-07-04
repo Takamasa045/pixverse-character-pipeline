@@ -34,6 +34,9 @@ const asString = (value: unknown): string | undefined =>
 const asNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
+const normalizeVoiceId = (value: Record<string, unknown>): string | null =>
+  asString(value.voiceId) ?? asString(value.voice_id) ?? null;
+
 const asUnitVolume = (value: unknown): number | undefined => {
   const parsed = asNumber(value);
 
@@ -64,7 +67,18 @@ const normalizeGenerateAudio = (value: unknown, legacyAmbientSound: unknown): bo
 
 const asOverlayStyle = (value: unknown): OverlayStyle => {
   const normalized = asString(value);
-  const allowed: OverlayStyle[] = ["title", "subtitle", "lower-third", "endcard", "none"];
+  const allowed: OverlayStyle[] = [
+    "title",
+    "subtitle",
+    "lower-third",
+    "endcard",
+    "title-story",
+    "story-top",
+    "story-bottom",
+    "quote",
+    "warning",
+    "none",
+  ];
   return allowed.includes(normalized as OverlayStyle) ? (normalized as OverlayStyle) : "none";
 };
 
@@ -137,7 +151,8 @@ const normalizeGeneratedClip = (
     overlayText: asString(value.overlayText) ?? "",
     source: "generated",
     text: asString(value.text),
-    ttsSpeaker: asNumber(value.ttsSpeaker) ?? 1,
+    ttsSpeaker: asNumber(value.ttsSpeaker) ?? null,
+    voiceId: normalizeVoiceId(value),
   };
 };
 
@@ -161,7 +176,8 @@ const normalizeReferenceClip = (
     prompt: asString(value.prompt) ?? "",
     source: "reference",
     text,
-    ttsSpeaker: asNumber(value.ttsSpeaker) ?? 1,
+    ttsSpeaker: asNumber(value.ttsSpeaker) ?? null,
+    voiceId: normalizeVoiceId(value),
   };
 };
 
@@ -349,7 +365,8 @@ const normalizeLegacyConfig = (raw: Record<string, unknown>, configDir: string):
               overlayText: "",
               source: "generated",
               text: asString(scriptValue.text),
-              ttsSpeaker: audioMode === "tts" ? asNumber(scriptValue.tts_speaker) ?? 1 : null,
+              ttsSpeaker: null,
+              voiceId: audioMode === "tts" ? asString(scriptValue.voice_id) ?? null : null,
             },
           ],
           theme: DEFAULT_THEME,

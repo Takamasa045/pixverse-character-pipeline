@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { access, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { runCommand } from "../lib/subprocess";
 
@@ -198,8 +199,85 @@ test("pipeline run dry-run allows generated clips without narration", async () =
   const manifest = JSON.parse(await readFile(payload.manifestPath, "utf8"));
 
   assert.equal(payload.ok, true);
+  assert.equal(payload.plan.voiceJobs, 0);
   assert.equal(payload.plan.speechJobs, 0);
   assert.equal(manifest.summary.planned, 1);
+});
+
+test("pipeline run dry-run treats audioFile narration as local asset, not voice job", async (t) => {
+  const tempDir = await mkdtemp(resolve(tmpdir(), "pixverse-audiofile-"));
+  t.after(async () => {
+    await rm(tempDir, { force: true, recursive: true });
+  });
+
+  const runId = "audio-file-dry-run";
+  const runDir = resolve(outputRoot, "audio-file-narration", runId);
+  await rm(runDir, { force: true, recursive: true });
+
+  const audioPath = resolve(tempDir, "narration.mp3");
+  const configPath = resolve(tempDir, "project.yaml");
+  await writeFile(audioPath, "placeholder audio fixture for dry-run only\n", "utf8");
+  await writeFile(
+    configPath,
+    `
+project:
+  slug: audio-file-narration
+  title: Audio File Narration
+  date: "2026-07-04"
+
+speaker:
+  images:
+    - ${JSON.stringify(resolve(repoRoot, "fixtures/shared/assets/speaker.svg"))}
+  mode: single
+
+locales:
+  en:
+    clips:
+      - id: opener
+        source: generated
+        audioFile: ${JSON.stringify(audioPath)}
+        durationSeconds: 2
+        overlayStyle: none
+
+render:
+  aspectRatios: ["16:9"]
+  outputDir: ${JSON.stringify(outputRoot)}
+
+generation:
+  upscale: false
+`,
+    "utf8",
+  );
+
+  const result = await runCommand(
+    pipelineBin,
+    [
+      "run",
+      "--config",
+      configPath,
+      "--dry-run",
+      "--run-id",
+      runId,
+    ],
+    {
+      captureOutput: true,
+      cwd: process.cwd(),
+    },
+  );
+
+  const payload = parseTrailingJson(result.stdout);
+  const manifest = JSON.parse(await readFile(payload.manifestPath, "utf8"));
+  const renderManifestPath = resolve(
+    dirname(payload.manifestPath),
+    manifest.variants[0].renderManifest,
+  );
+  const renderManifest = JSON.parse(await readFile(renderManifestPath, "utf8"));
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.plan.voiceJobs, 0);
+  assert.equal(payload.plan.speechJobs, 0);
+  assert.equal(payload.plan.totalJobs, 2);
+  assert.equal(renderManifest.cuts[0].narrationSrc.endsWith("/opener-narration.mp3"), true);
 });
 
 test("pipeline run dry-run supports reference clips without invoking PixVerse", async () => {

@@ -19,7 +19,6 @@ locales:
       - id: opener
         source: generated
         text: 本日のアップデートをお届けします。
-        ttsSpeaker: 1
         durationSeconds: 2
         overlayText: Spring Launch
         overlayStyle: title
@@ -43,7 +42,6 @@ locales:
       - id: opener
         source: generated
         text: Here is the latest update from the team.
-        ttsSpeaker: 1
         durationSeconds: 2
         overlayText: Spring Launch
         overlayStyle: title

@@ -59,7 +59,7 @@ A talking character derived from the provided character image, speaking directly
 
 ### Phase 3 / Mode C: Per-Cut Reference Prompt
 
-ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。PixVerse CLI 1.1.12 では `create reference` も `v6` 対応なので、既定は `generation.referenceModel: v6`。C1 寄りの reference 表現が必要な場合だけ `pixverse-c1` に上書きする。
+ストーリー動画では、各カットを `pixverse create reference --images` で個別に作る。`project.yaml` では各カットの `clips[].source: reference` に対応する `prompt` として使う。PixVerse CLI 1.2.x では `create reference` も `v6` 対応なので、既定は `generation.referenceModel: v6`。C1 寄りの action / choreography / VFX / continuity 表現が必要な場合だけ `pixverse-c1` に上書きする。
 
 テンプレート:
 ```
@@ -172,6 +172,7 @@ An animated character derived from the provided character image, in vertical por
 ## Notes
 
 - Keep prompts simple; 1-2 sentences is enough.
-- Do not describe lip sync. `create speech` handles speech animation separately.
+- Do not put narration text into the visual prompt. The pipeline uses `create voice` or `audioFile` as separate narration audio assets.
+- Use `voiceId` only when you have confirmed a PixVerse preset voice ID. Legacy `ttsSpeaker` numbers are not PixVerse CLI 1.2 voice preset IDs.
 - If ratios need different framing, set `generation.prompt.perRatio`.
 - If the selling point is "character into realistic background", make the background explicit: `photoreal office`, `live-action studio`, `real-world city street`, etc.

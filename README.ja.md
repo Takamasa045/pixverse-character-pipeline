@@ -93,6 +93,17 @@ HyperFrames か Remotion の編集 project として続きから触れるよう�
   - upscale の有無
   - 実写背景の雰囲気を決める prompt
 
+## 制作ルーティング
+
+プロンプトを書く前に、まず「どの workflow で作るか」を決めます。
+
+- model / workflow の選び方は [`references/model-routing.md`](./references/model-routing.md)
+- PixVerse CLI の model support は [`references/model-support.md`](./references/model-support.md)
+- PixVerse 制作の実務メモは [`references/pixverse-best-practices.md`](./references/pixverse-best-practices.md)
+- エージェント分担は [`agents/pixverse-production-agents.md`](./agents/pixverse-production-agents.md)
+
+ここでは PixVerse CLI に専念します。runtime の中心は引き続き `project.yaml` -> `validate` -> `plan` -> `run --dry-run` / 承認後 `run` / local `render` です。直接 PixVerse CLI を使う場合も、credit 境界と QA gate は同じです。
+
 ## エージェントが足りない情報を聞くとき
 
 依頼文だけで不足がある場合、エージェントは次の順で短く確認します。
@@ -122,7 +133,7 @@ HyperFrames か Remotion の編集 project として続きから触れるよう�
 
 1. 3-5 個のビートに分解する
 2. 各ビートを `pixverse create reference --images` で個別生成する
-3. 各カットに `pixverse create speech` を重ねる
+3. 各カットのナレーションは `pixverse create voice` で音声アセット化するか、`audioFile` を使う
 4. 各ビートを `source: reference` として `project.yaml` に書く
 5. 最後に `./bin/pipeline run` で reference 生成から BGM / テロップ込みの最終 render まで進める
 
@@ -132,7 +143,7 @@ HyperFrames か Remotion の編集 project として続きから触れるよう�
 2. `generation.model: v6` を維持する
 3. `source: reference` では既定で `generation.referenceModel: v6` を使う。C1 寄りのシネマティックな reference 表現を狙う場合だけ `pixverse-c1` に上書きする
 4. `generation.image.enabled: true` を維持する
-5. この workflow の `generation.image.model` 既定値は `gemini-3.1-flash`、`generation.image.quality` 既定値は `1080p`。PixVerse CLI 1.1.12 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、Seedream/Kling 系 image model も利用できる
+5. この workflow の `generation.image.model` 既定値は `gemini-3.1-flash`、`generation.image.quality` 既定値は `1080p`。PixVerse CLI 1.2.7 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、Seedream/Kling 系 image model も利用できる
 6. PixVerse の I2I (`create image`) でベース静止画を作ってから、I2V (`create video --image`) を実行する
 7. ユーザーが明示的に story / teaser / trailer / multi-cut を要求した場合、または複数の参照画像を渡した場合を除き、`source: reference` や `pixverse create reference` に切り替えない
 
@@ -213,7 +224,6 @@ locales:
       - id: intro
         source: generated
         text: 本日のお知らせです
-        ttsSpeaker: 1
         durationSeconds: 5
         overlayText: 春のキャンペーン開始
         overlayStyle: title
@@ -221,7 +231,6 @@ locales:
         source: reference
         prompt: The same character from the reference image stands in a moonlit shrine courtyard, slow push in, vertical portrait framing.
         text: 物語の扉が開く。
-        ttsSpeaker: 1
         durationSeconds: 4
         overlayText: 物語の扉が開く
         overlayStyle: subtitle
@@ -251,9 +260,9 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を共有ベース動画向けの動画用プロンプトとして使います。既定では PixVerse の I2I → I2V フローで、`generation.image.enabled` は `true` です。そのため、まず `generation.image.*` を使ってベース静止画を作ってローカルに保存し、その静止画から I2V を実行します。`generation.image.model` は PixVerse CLI に渡す image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p` です。PixVerse CLI 1.1.12 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども利用できます。`generation.image.prompt` を省略した場合は `generation.prompt` がフォールバックとして使われます。動画生成の既定プロファイルは `v6` の `720p` です。
+PixVerse 側では `generation.prompt.base` / `generation.prompt.perRatio` を共有ベース動画向けの動画用プロンプトとして使います。既定では PixVerse の I2I → I2V フローで、`generation.image.enabled` は `true` です。そのため、まず `generation.image.*` を使ってベース静止画を作ってローカルに保存し、その静止画から I2V を実行します。`generation.image.model` は PixVerse CLI に渡す image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p` です。PixVerse CLI 1.2.7 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども利用できます。`generation.image.prompt` を省略した場合は `generation.prompt` がフォールバックとして使われます。動画生成の既定プロファイルは `v6` の `720p` です。
 
-`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。既定の `generation.referenceModel` は `v6` で、必要なら `pixverse-c1` に上書きできます。`generateAudio: true` は PixVerse CLI の `--audio` に対応し、既定の `false` は `--no-audio` に対応します。旧 `ambientSound` フィールドは互換用の別名として受け付けますが、削除済みの `create sound` は呼びません。`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
+`source: reference` のクリップは、各カットごとの `prompt` を使って `pixverse create reference --images` で個別生成されます。既定の `generation.referenceModel` は `v6` で、必要なら `pixverse-c1` に上書きできます。`generateAudio: true` は PixVerse CLI の `--audio` に対応し、既定の `false` は `--no-audio` に対応します。`generated` / `reference` の `text` は PixVerse `create voice` の音声アセットとして生成し、Remotion でカットに重ねます。既存音声を使う場合は `audioFile`、PixVerse の特定プリセット声を使う場合は確認済みの `voiceId` を指定します。旧 `ambientSound` フィールドは互換用の別名として受け付けますが、削除済みの `create sound` は呼びません。`generated` / `reference` / `video` の各クリップでは、`audioVolume` (`0`-`1`) も指定でき、BGM に対する音量バランスを調整できます。
 
 PixVerse CLI の全モデル表、mode matrix、source 差分メモは [`references/model-support.md`](./references/model-support.md) を参照してください。
 
@@ -405,7 +414,7 @@ cd remotion
 pnpm install
 ```
 
-`pnpm install` で、この repo が pin している PixVerse CLI (`pixverse@^1.1.12`) も入ります。`./bin/pipeline` は `PIXVERSE_BIN` があればそれを使い、未指定なら `remotion/node_modules/.bin/pixverse`、最後に PATH 上の `pixverse` を使います。
+`pnpm install` で、この repo が pin している PixVerse CLI (`pixverse@^1.2.7`) も入ります。`./bin/pipeline` は `PIXVERSE_BIN` があればそれを使い、未指定なら `remotion/node_modules/.bin/pixverse`、最後に PATH 上の `pixverse` を使います。
 
 ## CLI を直接使いたいとき
 

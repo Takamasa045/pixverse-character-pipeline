@@ -4,7 +4,7 @@ description: >
   Generate character videos from a single character image. Three modes:
   (A) Creative workflow — 3-view turnaround, cut image generation, I2I, I2V, lip sync, Remotion edit.
   (B) Config-driven pipeline — project.yaml → validate → plan → run → render.
-  (C) Reference story workflow — per-cut `pixverse create reference --images` → speech → pipeline timeline.
+  (C) Reference story workflow — per-cut `pixverse create reference --images` → voice audio asset → pipeline timeline.
   Use when the user says "character video", "talking character", "lip sync video",
   "キャラクター動画", "多言語アナウンス動画", "multilingual video",
   "このキャラで動画作って", "キャラを実写背景に馴染ませて".
@@ -41,15 +41,16 @@ metadata:
 1. **3面図は必ず最初に作る** — キャラ一貫性の土台。複数カットに進む前に必須（Mode A）
 2. **画像生成は PixVerse `create image` を使う** — 3面図もカット画像も `--image` / `--images` の I2I で作る。`generation.image.model` には PixVerse CLI の image model を指定する
 3. **動画生成は I2V を優先** — 単一画像フローでは合成画像を `create video --image` に渡す。T2V はキャラ一貫性が崩れやすい
-4. **ナレーションは PixVerse `create speech`** — 動画に直接焼き込む。Remotion は `hasAudio: true` で音声をそのまま使う
+4. **ナレーションは PixVerse `create voice` または `audioFile`** — CLI 1.2.x では音声を別アセットとして作り、Remotion の `narrationSrc` でカットに重ねる
 5. **Every PixVerse call must include `--json`**
 6. **カメラワークの重複禁止** — 全カット同じカメラワークにしない（→ `references/prompt-library.md`）
 7. **固定尺スライドショー禁止** — カットごとに秒数を変えてリズムを作る（4/5/6/4/3s など）
 8. **構成設計は `short-video-editing` スキルに従う**
 9. **`story` / `teaser` / `trailer` / `multi-cut` 指示では Mode C を優先** — 共有ベース動画ではなく、各カットを個別に `pixverse create reference --images` で作る
 10. **Mode C では `source: reference` を優先** — pipeline runtime で各カットを直接 reference 生成できる。すでにローカル素材化済みなら `video` へ落としてよい
-11. **PixVerse CLI 1.1.12 では reference も `v6` 対応** — `generation.model` と `generation.referenceModel` の既定はどちらも `v6`。C1 寄りの reference 表現が必要なときだけ `pixverse-c1` に上書きする
+11. **PixVerse CLI 1.2.7 では reference も `v6` 対応** — `generation.model` と `generation.referenceModel` の既定はどちらも `v6`。C1 寄りの reference 表現が必要なときだけ `pixverse-c1` に上書きする
 12. **モデル表は `references/model-support.md` を見る** — CLI README と公式 skill の表を突き合わせた repo-local source of truth
+13. **CLI制作ルーティングは `references/model-routing.md` を見る** — PixVerse CLI の command family、model candidate、batch、post-process、audio、QC を先に選ぶ
 
 ---
 
@@ -64,7 +65,7 @@ Phase 2: カット画像生成 (PixVerse CLI) — 実写背景に合成
     ▼
 Phase 3: I2V 動画化 (PixVerse CLI)
     ▼
-Phase 4: リップシンク TTS (PixVerse CLI)
+Phase 4: ナレーション音声生成 (PixVerse CLI)
     ▼
 Phase 5: Remotion 編集・レンダリング
     ▼
@@ -87,7 +88,7 @@ pixverse create image \
 
 補足:
 - 複数の参照画像がある場合は `--image` の代わりに `--images` を使う
-- `gemini-3.1-flash` はこの workflow の既定値。PixVerse CLI 1.1.12 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども使える
+- `gemini-3.1-flash` はこの workflow の既定値。PixVerse CLI 1.2.7 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども使える
 
 ### Phase 2: カット画像生成
 
@@ -128,21 +129,21 @@ pixverse create video \
 - 背景の動き（風、光、雲）も加える
 - カメラワークを文中に含める（→ `references/prompt-library.md`）
 
-### Phase 4: リップシンク TTS
+### Phase 4: ナレーション音声
 
 ナレーション付きカットに適用:
 
 ```bash
-pixverse create speech \
-  --video [動画ファイルパス] \
-  --tts-text "[ナレーションテキスト]" \
+pixverse create voice \
+  --text "[ナレーションテキスト]" \
+  --model speech-2.8-hd \
   --no-wait --json
 ```
 
 注意:
 - 日本語の場合「AI」→「えーあい」など読み補正が必要なことがある
-- 生成後の動画は尺が変わる場合がある。`durationInFrames` を確認
-- `--keep-original-sound` で元の動画音声を残せる
+- 特定の声を使う場合は、`pixverse voice presets --model <id>` で確認した PixVerse preset voice ID を `voiceId` に入れる
+- 既存音声を使う場合は `audioFile` を指定し、PixVerse voice job を作らない
 
 ### Phase 5: Remotion 編集
 
@@ -179,7 +180,7 @@ manifest.json を手動で作成し、Remotion でレンダリング:
 
 | ケース | hasAudio | 説明 |
 |--------|----------|------|
-| PixVerse TTS 適用済み | `true` | 動画の音声をそのまま使う |
+| PixVerse voice / audioFile あり | `true` | Remotion で `narrationSrc` を重ねる |
 | BGM のみ | `false` | 動画をミュート再生 |
 | エンドカード | `false` | 静止画なので音声なし |
 
@@ -218,7 +219,6 @@ locales:
       - id: intro
         source: generated
         text: 本日のお知らせです
-        ttsSpeaker: 1
         durationSeconds: 5
         overlayText: 春のキャンペーン開始
         overlayStyle: title
@@ -248,18 +248,18 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-既定では `generation.image.enabled: true` で、PixVerse `create image` を使ってベース静止画を作ってから I2V に渡す。添付画像が 1 枚でも複数枚でもこのフローを優先し、通常動画の `generation.model` は `v6` を維持する。`generation.image.model` は PixVerse CLI の image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p`。PixVerse CLI 1.1.12 の全モデル表は `references/model-support.md` を参照。`generation.image.prompt` が未指定なら `generation.prompt` を使う。`source: reference` は既定で `generation.referenceModel: v6` を使う。`generateAudio: true` は CLI の `--audio`、既定の `false` は `--no-audio` に対応する。
+既定では `generation.image.enabled: true` で、PixVerse `create image` を使ってベース静止画を作ってから I2V に渡す。添付画像が 1 枚でも複数枚でもこのフローを優先し、通常動画の `generation.model` は `v6` を維持する。`generation.image.model` は PixVerse CLI の image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p`。PixVerse CLI 1.2.7 の全モデル表は `references/model-support.md` を参照。`generation.image.prompt` が未指定なら `generation.prompt` を使う。`source: reference` は既定で `generation.referenceModel: v6` を使う。`generateAudio: true` は CLI の `--audio`、既定の `false` は `--no-audio` に対応する。`text` がある `generated` / `reference` clip は `create voice` でナレーション音声を作り、特定声が必要な場合は `voiceId` を指定する。
 
 `project.yaml` がない場合 → `references/interactive-questions.md` のフローでヒアリング。
 
 ### Clip Semantics
 
-- `source: generated` — requires `text` or `audioFile`; pipeline runs direct I2V or `create image` → I2V before PixVerse `create speech`
+- `source: generated` — requires `text` or `audioFile`; pipeline runs direct I2V or `create image` → I2V, then adds narration through `create voice` or `audioFile`
 - `source: video` — requires `asset`, uses local file in Remotion
 - `source: image` — requires `asset`, renders as still/endcard
 - `source: reference` — only use when the user explicitly wants story / teaser / trailer / multi-cut behavior
 
-Optional: `overlayText`, `overlayStyle`, `ttsSpeaker`, `hasAudio`
+Optional: `overlayText`, `overlayStyle`, `voiceId`, `audioFile`, `hasAudio`
 
 ---
 
@@ -274,7 +274,7 @@ Phase 1: 3-5個のストーリービートを設計
     ▼
 Phase 2: 各ビートを `pixverse create reference --images` で個別生成
     ▼
-Phase 3: 各カットへ `pixverse create speech` でTTSを重ねる
+Phase 3: 各カットの `text` を `pixverse create voice` で音声化する、または `audioFile` を使う
     ▼
 Phase 4: pipeline 内で download / sound / upscale を処理
     ▼
@@ -313,7 +313,7 @@ pixverse create reference \
 
 注意:
 - `pixverse create reference --images` は 1-7 枚で使える
-- PixVerse CLI 1.1.12 の `create reference` は `v6` 対応。既定は `v6`、必要に応じて `pixverse-c1` へ上書きできる
+- PixVerse CLI 1.2.7 の `create reference` は `v6` 対応。既定は `v6`、必要に応じて `pixverse-c1` へ上書きできる
 - ただし pipeline config の `speaker.mode=reference` は 2-7 枚必須
 - 画像が1枚でも複数枚でも、明示的に story / teaser / trailer / multi-cut を求められた場合だけ `source: reference` を使う
 - `speaker.mode: reference` を使うのは、reference-driven workflow を明示したい場合だけ
@@ -336,7 +336,6 @@ locales:
         source: reference
         prompt: The same character from the reference image steps into a moonlit shrine path, slow push in, vertical portrait framing.
         text: 物語が動き出す。
-        ttsSpeaker: 1
         durationSeconds: 4
         overlayText: 物語の始まり
         overlayStyle: subtitle
@@ -372,7 +371,7 @@ cd remotion
 4. Optionally generate base images per aspect ratio (`generation.image.enabled=true` の場合)
 5. Generate base videos per aspect ratio (generated clips exist の場合)
 6. Generate per-cut reference videos (`source: reference` がある場合)
-7. Generate speech per generated or reference clip
+7. Generate voice audio per generated or reference clip that has `text`
 8. Optionally run sound and upscale
 9. Download generated assets
 10. Build `manifest.render.json` per variant
@@ -397,8 +396,8 @@ cd remotion
 | `pixverse create image` | Base still image generation |
 | `pixverse create video --image` | Base video from one image |
 | `pixverse create reference --images` | Base video from multiple images |
-| `pixverse create speech --tts-text` | TTS lip sync |
-| `pixverse create speech --audio` | Audio-file lip sync |
+| `pixverse create voice --text` | TTS narration audio asset |
+| `audioFile` in `project.yaml` | Pre-recorded narration audio |
 | `pixverse create video --audio` / `--no-audio` | Optional generated audio switch |
 | `pixverse create upscale --quality` | Optional final upscale |
 | `--idempotency-key` | Passed automatically by pipeline `run` for retry-safe create jobs |
@@ -453,7 +452,7 @@ Remotion staging assets → `remotion/public/.pipeline/`
 | PixVerse CLI (`pixverse create image`) | 3面図 + カット画像生成 (Mode A / B) |
 | PixVerse CLI (`pixverse create video`) | I2V 動画生成 |
 | PixVerse CLI (`pixverse create reference`) | 複数画像からの reference 動画生成 |
-| PixVerse CLI (`pixverse create speech`) | リップシンク TTS |
+| PixVerse CLI (`pixverse create voice`) | ナレーション音声生成 |
 | Remotion | 編集・レンダリング |
 | `short-video-editing` スキル | 構成設計・レビュー |
 | `remotion-best-practices` スキル | Remotion コード |
@@ -464,5 +463,8 @@ Remotion staging assets → `remotion/public/.pipeline/`
 - `references/interactive-questions.md` — project.yaml なしの対話ヒアリングフロー
 - `references/prompt-library.md` — プロンプト構築ガイド + カメラワーク語彙 + スタイルテンプレート
 - `references/model-support.md` — PixVerse CLI / 公式 skill 由来の最新モデル表
+- `references/model-routing.md` — 目的別の workflow / model candidate / optional surface の選び方
+- `references/pixverse-best-practices.md` — CLI command family / V6 / C1 candidate / batch / asset / audio / regeneration の実務メモ
+- `agents/pixverse-production-agents.md` — Coordinator / Model Router / Prompt Designer / QC などの役割分担
 - `references/pipeline-diagram.md` — パイプライン Mermaid フローチャート + ジョブ数計算式
 - `references/manifest-schema.md` — Creative / Pipeline 両 manifest の JSON スキーマ

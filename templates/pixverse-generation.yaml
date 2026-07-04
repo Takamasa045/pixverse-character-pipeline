@@ -1,0 +1,43 @@
+project_name:
+purpose:
+platform:
+aspect_ratio: "9:16"
+duration: 8
+
+model_candidate:
+  - v6
+workflow:
+  primary: cli
+  command_family: create video
+  fallback: create reference
+generation_mode: image_to_video
+audio: false
+
+inputs:
+  character_reference:
+  environment_reference:
+  prop_reference:
+
+creative_intent:
+  concept:
+  tone:
+  target_emotion:
+  first_frame_hook:
+
+shot:
+  camera:
+  motion:
+  action:
+  background:
+
+consistency_rules:
+  - Keep the same character design.
+  - Keep important colors and props stable.
+  - Do not bend, melt, or replace key tools.
+
+qc:
+  check_character: true
+  check_tool_shape: true
+  check_camera_motion: true
+  check_locality: true
+  check_social_hook: true

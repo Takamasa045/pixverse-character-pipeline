@@ -143,7 +143,6 @@ export const buildStoryProjectConfig = (answers: StoryAnswers): ProjectConfig =>
     prompt: beat.prompt,
     source: "reference" as const,
     text: beat.narration || undefined,
-    ttsSpeaker: beat.narration ? 1 : undefined,
   }));
 
   return {

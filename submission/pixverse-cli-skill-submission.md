@@ -15,7 +15,7 @@ Submit this as both:
 
 ## One-Paragraph Pitch
 
-This repository packages PixVerse CLI into a reusable multilingual character-video workflow for AI agents and terminal-first creators. Its strongest use case is turning a character image into a talking character video placed inside a photoreal, live-action-style background, then combining that with multilingual speech generation and final MP4 rendering via Remotion. The workflow supports multiple locales, multiple aspect ratios, dry-run planning, legacy config compatibility, and deterministic output paths that are suitable for automation and OpenClaw-style agent environments.
+This repository packages PixVerse CLI into a reusable multilingual character-video workflow for AI agents and terminal-first creators. Its strongest use case is turning a character image into a talking character video placed inside a photoreal, live-action-style background, then combining that with voice narration assets and final MP4 rendering via Remotion. The workflow supports multiple locales, multiple aspect ratios, dry-run planning, legacy config compatibility, and deterministic output paths that are suitable for automation and OpenClaw-style agent environments.
 
 ## What Makes It Useful
 
@@ -46,8 +46,9 @@ pnpm test
 - `pixverse create image`
 - `pixverse create video --image`
 - `pixverse create reference --images`
-- `pixverse create speech --tts-text`
-- `pixverse create speech --audio`
+- `pixverse create voice --text`
+- `audioFile` narration handoff in `project.yaml`
+- `pixverse create music` as a documented direct-CLI BGM preparation step; not yet automated from `project.yaml`
 - `pixverse create video --audio` / `--no-audio`
 - `pixverse create upscale --quality`
 - `pixverse task wait <id> --json`

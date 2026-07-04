@@ -64,7 +64,7 @@ pixverse asset download ...
 - config path
 - run-id
 - variant count
-- image/base/reference/speech/upscale job counts
+- image/base/reference/voice/upscale job counts
 - PixVerse credit or slot risk
 - generated / reference / local clip の内訳
 
@@ -106,6 +106,16 @@ local render または full run の後に確認する。
 - video / image / bgm assets が staging にコピーされている。
 - failed variant がある場合は `NEXT_ACTIONS.md` に戻す。
 
+## Character Reference QA
+
+見えるキャラクターを含む generated / reference clip を採用する前に確認する。
+
+- 参照画像と候補クリップの contact sheet を横並びで確認した。
+- 顔、体格、髪型、衣装、持ち物、主要な色が参照キャラクターから大きく外れていない。
+- 別の年齢・性別・体格・髪色・衣装・人物種別に変わった場合は、動作や背景が正しくても FAIL とする。
+- ストーリー上の因果、背景連続性、テロップ、音声だけで PASS にしない。
+- 採用レビューには「何が参照一致しているか」と「許容した差分」を短く残す。
+
 ## Runtime Code Check
 
 `remotion/src` を変えたときに実行する。
@@ -132,7 +142,7 @@ PixVerse CLI や model table を更新するとき。
 
 - `npm view pixverse version` で latest を確認した。
 - repo-local `remotion/node_modules/.bin/pixverse` の version を確認した。
-- `create video` / `create reference` / `create image` / `create speech` / `create upscale` / `task wait` / `asset download` の help を確認した。
+- `create video` / `create reference` / `create image` / `create voice` / `create music` / `create upscale` / `task wait` / `asset download` の help を確認した。
 - `references/model-support.md` と code の既定値が矛盾しない。
 - "latest everything" ではなく "latest compatible" として判断した。
 - pinned exception がある場合、理由を `DECISIONS.md` に残した。

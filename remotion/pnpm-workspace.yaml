@@ -1,3 +1,5 @@
 allowBuilds:
   esbuild: false
   sharp: true
+minimumReleaseAgeExclude:
+  - pixverse@1.2.7

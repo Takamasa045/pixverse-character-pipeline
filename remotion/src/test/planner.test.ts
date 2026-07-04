@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { loadProjectConfig } from "../lib/config";
 import { buildPipelinePlan } from "../lib/planner";
 
-test("planner counts base, speech and upscale jobs for mixed generated config", async () => {
+test("planner counts base, voice and upscale jobs for mixed generated config", async () => {
   const loaded = await loadProjectConfig(resolve(process.cwd(), "../fixtures/generated/project.yaml"));
   const plan = buildPipelinePlan(loaded);
 
@@ -13,6 +13,7 @@ test("planner counts base, speech and upscale jobs for mixed generated config", 
   assert.equal(plan.totals.baseJobs, 2);
   assert.equal(plan.totals.imageJobs, 2);
   assert.equal(plan.totals.audioJobs, 0);
+  assert.equal(plan.totals.voiceJobs, 4);
   assert.equal(plan.totals.speechJobs, 4);
   assert.equal(plan.totals.soundJobs, 0);
   assert.equal(plan.totals.upscaleJobs, 4);
@@ -29,13 +30,14 @@ test("planner counts per-cut reference jobs separately from shared base jobs", a
   assert.equal(plan.totals.baseJobs, 0);
   assert.equal(plan.totals.referenceJobs, 2);
   assert.equal(plan.totals.audioJobs, 0);
+  assert.equal(plan.totals.voiceJobs, 1);
   assert.equal(plan.totals.speechJobs, 1);
   assert.equal(plan.totals.totalJobs, 3);
   assert.equal(plan.variants[0]?.referenceClipCount, 2);
   assert.equal(plan.variants[0]?.usesReferenceClips, true);
 });
 
-test("planner does not count speech jobs for silent generated clips", async () => {
+test("planner does not count voice jobs for silent generated clips", async () => {
   const loaded = await loadProjectConfig(
     resolve(process.cwd(), "../fixtures/generated/silent-project.yaml"),
   );
@@ -45,6 +47,7 @@ test("planner does not count speech jobs for silent generated clips", async () =
   assert.equal(plan.totals.baseJobs, 1);
   assert.equal(plan.totals.imageJobs, 1);
   assert.equal(plan.totals.audioJobs, 0);
+  assert.equal(plan.totals.voiceJobs, 0);
   assert.equal(plan.totals.speechJobs, 0);
   assert.equal(plan.totals.totalJobs, 2);
 });

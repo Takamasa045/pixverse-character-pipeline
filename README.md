@@ -32,6 +32,12 @@ This repo is designed to work with both Claude Code and Codex. The runtime is to
 - Accept legacy `spokesperson.yaml` as a backward-compatible input format.
 - Prepare optional Michibiki handoff files for Remotion, HyperFrames, or Editframe workflows.
 
+### Production Routing
+
+For bigger requests, first route the production choice before writing prompts. Use `references/model-routing.md` to choose the PixVerse CLI command family: text-to-video, image-to-video, image generation, reference video, motion control, transition, modify, extend, upscale, voice, music, template, batch, or local render. Keep model details in `references/model-support.md`, production practices in `references/pixverse-best-practices.md`, and agent role splits in `agents/pixverse-production-agents.md`; routing docs should explain why a command family is chosen, not maintain another model matrix.
+
+The runtime path remains `project.yaml` -> `validate` -> `plan` -> `run --dry-run` / approved `run` / local `render`. Direct PixVerse CLI commands are documented as production building blocks and should still follow the same credit and QA gates.
+
 ### Request and Execution Flow
 
 The entry point is a natural-language request, not a command. The agent normalizes the request into `project.yaml`. If information is missing, it asks briefly for the project name, character image, target locales, clip composition, aspect ratios, and background direction.
@@ -42,7 +48,7 @@ For story / teaser / trailer requests, the default behavior is to split the conc
 
 ### Setup and Main Commands
 
-Prerequisites are Node.js 20+, a PixVerse account, and an active subscription. Run `pnpm install` inside `remotion` to install dependencies and the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). Login with `pixverse auth login`; check status with `pixverse auth status` and `pixverse account info`.
+Prerequisites are Node.js 20+, a PixVerse account, and an active subscription. Run `pnpm install` inside `remotion` to install dependencies and the repo-pinned PixVerse CLI (`pixverse@^1.2.7`). Login with `pixverse auth login`; check status with `pixverse auth status` and `pixverse account info`.
 
 Main commands are `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story`, and `./bin/pipeline render`. Prefer `./bin/pipeline` over `pnpm pipeline:*` when shell PATH resolution is unreliable.
 
@@ -98,6 +104,12 @@ All image and video generation paths documented in this repo are implemented thr
 - legacy の `spokesperson.yaml` を後方互換入力として受け付ける。
 - Michibiki へ渡す Remotion / HyperFrames / Editframe 向け handoff を作る。
 
+### 制作ルーティング
+
+大きめの依頼では、プロンプトを書く前に「どの CLI command family で作るか」を決めます。`references/model-routing.md` を使い、text-to-video、image-to-video、image generation、reference video、motion control、transition、modify、extend、upscale、voice、music、template、batch、local render を選びます。モデル表は `references/model-support.md` に寄せ、routing 側では「なぜその command family か」を説明します。
+
+runtime の中心は引き続き `project.yaml` -> `validate` -> `plan` -> `run --dry-run` / 承認後 `run` / local `render` です。直接 PixVerse CLI を使う場合も、credit 境界と QA gate は同じです。
+
 ### 依頼と実行の流れ
 
 入口はコマンドではなく自然文です。エージェントは依頼文を `project.yaml` に正規化し、必要な情報が足りない場合は案件名、キャラ画像、生成言語、clip 構成、アスペクト比、背景方向性の順に短く確認します。
@@ -108,7 +120,7 @@ story / teaser / trailer では、3-5 個の beat に分解し、各 beat を `s
 
 ### セットアップと主なコマンド
 
-前提は Node.js 20+、PixVerse account、有効な subscription です。`cd remotion` して `pnpm install` を実行すると、repo-pinned の PixVerse CLI (`pixverse@^1.1.12`) も入ります。ログインは `pixverse auth login`、確認は `pixverse auth status` と `pixverse account info` です。
+前提は Node.js 20+、PixVerse account、有効な subscription です。`cd remotion` して `pnpm install` を実行すると、repo-pinned の PixVerse CLI (`pixverse@^1.2.7`) も入ります。ログインは `pixverse auth login`、確認は `pixverse auth status` と `pixverse account info` です。
 
 主な入口は `./bin/pipeline validate`、`./bin/pipeline plan`、`./bin/pipeline run --dry-run`、`./bin/pipeline story`、`./bin/pipeline render` です。PATH 解決が不安定な環境では `pnpm pipeline:*` より `./bin/pipeline` を優先します。
 
@@ -172,7 +184,7 @@ story / teaser / trailer 请求默认拆成 3-5 个 beat，并把每个 beat 写
 
 ### 安装与主要命令
 
-需要 Node.js 20+、PixVerse account 和有效 subscription。在 `remotion` 目录执行 `pnpm install` 会安装 repo-pinned PixVerse CLI (`pixverse@^1.1.12`)。登录使用 `pixverse auth login`，状态检查使用 `pixverse auth status` 和 `pixverse account info`。
+需要 Node.js 20+、PixVerse account 和有效 subscription。在 `remotion` 目录执行 `pnpm install` 会安装 repo-pinned PixVerse CLI (`pixverse@^1.2.7`)。登录使用 `pixverse auth login`，状态检查使用 `pixverse auth status` 和 `pixverse account info`。
 
 主要入口是 `./bin/pipeline validate`、`./bin/pipeline plan`、`./bin/pipeline run --dry-run`、`./bin/pipeline story`、`./bin/pipeline render`。如果 shell PATH 不稳定，优先使用 `./bin/pipeline`，而不是 `pnpm pipeline:*`。
 
@@ -236,7 +248,7 @@ story / teaser / trailer 요청은 기본적으로 3-5개의 beat로 나누고, 
 
 ### 설정과 주요 명령
 
-필요 조건은 Node.js 20+, PixVerse account, 활성 subscription입니다. `remotion` 디렉터리에서 `pnpm install`을 실행하면 repo-pinned PixVerse CLI (`pixverse@^1.1.12`)도 설치됩니다. 로그인은 `pixverse auth login`, 확인은 `pixverse auth status`와 `pixverse account info`를 사용합니다.
+필요 조건은 Node.js 20+, PixVerse account, 활성 subscription입니다. `remotion` 디렉터리에서 `pnpm install`을 실행하면 repo-pinned PixVerse CLI (`pixverse@^1.2.7`)도 설치됩니다. 로그인은 `pixverse auth login`, 확인은 `pixverse auth status`와 `pixverse account info`를 사용합니다.
 
 주요 진입점은 `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story`, `./bin/pipeline render`입니다. shell PATH 해석이 불안정한 환경에서는 `pnpm pipeline:*`보다 `./bin/pipeline`을 우선 사용합니다.
 
@@ -300,7 +312,7 @@ Para story / teaser / trailer, el comportamiento por defecto es dividir la idea 
 
 ### Setup y comandos principales
 
-Los requisitos son Node.js 20+, una cuenta de PixVerse y una subscription activa. Dentro de `remotion`, `pnpm install` instala también la PixVerse CLI fijada por el repo (`pixverse@^1.1.12`). El login se hace con `pixverse auth login`; el estado se revisa con `pixverse auth status` y `pixverse account info`.
+Los requisitos son Node.js 20+, una cuenta de PixVerse y una subscription activa. Dentro de `remotion`, `pnpm install` instala también la PixVerse CLI fijada por el repo (`pixverse@^1.2.7`). El login se hace con `pixverse auth login`; el estado se revisa con `pixverse auth status` y `pixverse account info`.
 
 Los comandos principales son `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story` y `./bin/pipeline render`. Si la resolución de PATH del shell no es estable, usa `./bin/pipeline` antes que `pnpm pipeline:*`.
 
@@ -364,7 +376,7 @@ Pour les demandes story / teaser / trailer, le comportement par défaut consiste
 
 ### Installation et commandes principales
 
-Les prérequis sont Node.js 20+, un compte PixVerse et une subscription active. Dans le dossier `remotion`, `pnpm install` installe aussi la PixVerse CLI fixée par le repo (`pixverse@^1.1.12`). La connexion se fait avec `pixverse auth login`; l'état se vérifie avec `pixverse auth status` et `pixverse account info`.
+Les prérequis sont Node.js 20+, un compte PixVerse et une subscription active. Dans le dossier `remotion`, `pnpm install` installe aussi la PixVerse CLI fixée par le repo (`pixverse@^1.2.7`). La connexion se fait avec `pixverse auth login`; l'état se vérifie avec `pixverse auth status` et `pixverse account info`.
 
 Les commandes principales sont `./bin/pipeline validate`, `./bin/pipeline plan`, `./bin/pipeline run --dry-run`, `./bin/pipeline story` et `./bin/pipeline render`. Lorsque la résolution du PATH shell est instable, privilégiez `./bin/pipeline` plutôt que `pnpm pipeline:*`.
 
@@ -462,7 +474,7 @@ Default behavior for story / teaser / trailer requests:
 
 1. Break the concept into 3-5 story beats
 2. Generate each beat independently with `pixverse create reference --images`
-3. Add speech per cut with `pixverse create speech`
+3. Generate narration audio per cut with `pixverse create voice`, or use `audioFile`
 4. Write those beats as `source: reference` clips in `project.yaml`
 5. Use `./bin/pipeline run` to do reference generation, BGM / caption staging, and final render
 
@@ -472,7 +484,7 @@ Default behavior for attached character image(s):
 2. Keep `generation.model: v6`
 3. Use `generation.referenceModel: v6` for `source: reference` clips; set `pixverse-c1` only when you explicitly want C1-style cinematic reference behavior
 4. Keep `generation.image.enabled: true`
-5. Default this workflow's `generation.image.model` to `gemini-3.1-flash` and `generation.image.quality` to `1080p` (PixVerse CLI 1.1.12 also supports `gpt-image-2.0`, `qwen-image`, `gemini-3.0`, and Seedream/Kling image models)
+5. Default this workflow's `generation.image.model` to `gemini-3.1-flash` and `generation.image.quality` to `1080p` (PixVerse CLI 1.2.7 also supports `gpt-image-2.0`, `qwen-image`, `gemini-3.0`, and Seedream/Kling image models)
 6. Start from PixVerse I2I (`create image`) and then run I2V (`create video --image`)
 7. Do not switch to `source: reference` or `pixverse create reference` unless the user explicitly asks for a story / teaser / trailer / multi-cut workflow or provides multiple reference images
 
@@ -520,7 +532,7 @@ cd remotion
 pnpm install
 ```
 
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.1.12`). `./bin/pipeline` uses `PIXVERSE_BIN` when set, otherwise it prefers `remotion/node_modules/.bin/pixverse`, then falls back to `pixverse` on PATH.
+`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.2.7`). `./bin/pipeline` uses `PIXVERSE_BIN` when set, otherwise it prefers `remotion/node_modules/.bin/pixverse`, then falls back to `pixverse` on PATH.
 
 ## Main Commands
 
@@ -568,7 +580,6 @@ locales:
       - id: intro
         source: generated
         text: 本日のお知らせです
-        ttsSpeaker: 1
         durationSeconds: 5
         overlayText: 春のキャンペーン開始
         overlayStyle: title
@@ -576,7 +587,6 @@ locales:
         source: reference
         prompt: The same character from the reference image stands in a moonlit shrine courtyard, slow push in, vertical portrait framing.
         text: 物語の扉が開く。
-        ttsSpeaker: 1
         durationSeconds: 4
         overlayText: 物語の扉が開く
         overlayStyle: subtitle
@@ -606,9 +616,9 @@ generation:
     base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
 ```
 
-PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name; this workflow defaults to `gemini-3.1-flash` at `1080p`, while PixVerse CLI 1.1.12 also supports current image models such as `gpt-image-2.0`, `qwen-image`, `gemini-3.0`, `seedream-5.0-lite`, and Kling image models. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
+PixVerse uses `generation.prompt.base` / `generation.prompt.perRatio` for shared video motion prompts. The default path is PixVerse I2I then PixVerse I2V: `generation.image.enabled` defaults to `true`, so the pipeline first creates a base still with `generation.image.*`, downloads it locally, then runs I2V from that still. `generation.image.model` is the PixVerse CLI image model name; this workflow defaults to `gemini-3.1-flash` at `1080p`, while PixVerse CLI 1.2.7 also supports current image models such as `gpt-image-2.0`, `qwen-image`, `gemini-3.0`, `seedream-5.0-lite`, and Kling image models. When `generation.image.prompt` is omitted, it falls back to `generation.prompt`. The default video generation profile is `v6` at `720p`.
 
-`source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. They use `generation.referenceModel` (`v6` by default; `pixverse-c1` remains available as an override). `generateAudio: true` maps to PixVerse CLI `--audio`; the default `false` maps to `--no-audio`. The legacy `ambientSound` field is accepted as a compatibility alias, but the pipeline no longer calls the removed `create sound` command. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
+`source: reference` clips additionally provide a per-cut `prompt` and use `pixverse create reference --images` instead of the shared base-video flow. They use `generation.referenceModel` (`v6` by default; `pixverse-c1` remains available as an override). `generateAudio: true` maps to PixVerse CLI `--audio`; the default `false` maps to `--no-audio`. Narration text in `generated` / `reference` clips is turned into a separate PixVerse `create voice` audio asset and layered in Remotion; use `audioFile` for pre-recorded narration, and `voiceId` only for confirmed PixVerse preset voice IDs. The legacy `ambientSound` field is accepted as a compatibility alias, but the pipeline no longer calls the removed `create sound` command. `generated`, `reference`, and `video` clips may also set `audioVolume` (`0`-`1`) to rebalance narration or clip audio against BGM.
 
 For the full PixVerse CLI model table, mode matrix, and source reconciliation notes, see [`references/model-support.md`](./references/model-support.md).
 

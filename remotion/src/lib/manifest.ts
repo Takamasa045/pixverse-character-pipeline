@@ -7,6 +7,7 @@ type BuildRenderManifestArgs = {
   assets: {
     bgmPublicPath: string | null;
     clipAssetPublicPaths: Record<string, string>;
+    clipNarrationPublicPaths?: Record<string, string>;
     speakerImagePublicPath: string;
   };
   config: ProjectConfig;
@@ -34,6 +35,7 @@ export const buildRenderManifest = ({
       hasAudio: clip.source === "image" ? false : clip.hasAudio ?? clip.source === "generated",
       id: clip.id,
       imageSrc: clip.source === "image" ? publicPath : null,
+      narrationSrc: assets.clipNarrationPublicPaths?.[clip.id] ?? null,
       overlayStyle: clip.overlayStyle ?? "none",
       overlayText: clip.overlayText ?? "",
       startFrame: currentFrame,
