@@ -89,10 +89,12 @@ AI エージェントは、判断前に次を優先して読む。
 4. `SKILL.md`
 5. `references/interactive-questions.md`
 6. `references/model-support.md`
-7. `fixtures/*/project.yaml`
-8. `output/**/manifest.json` when reviewing a completed or dry-run output
+7. `references/credit-estimation.md` and `references/exit-codes.md` for spend / retry planning
+8. `references/lesson-codification.md` when promoting run learnings
+9. `fixtures/*/project.yaml`
+10. `output/**/manifest.json` when reviewing a completed or dry-run output
 
-`output/` is ignored by git. It may be used as local evidence during a session, but permanent public knowledge should be summarized into tracked docs without private details.
+`output/` is ignored by git. It may be used as local evidence during a session, but permanent public knowledge should be summarized into tracked docs without private details. Reusable operational lessons belong in `references/`, unfinished work in `NEXT_ACTIONS.md`, and policy changes in `DECISIONS.md`.
 
 ## Success Definition
 
@@ -104,3 +106,4 @@ AI エージェントは、判断前に次を優先して読む。
 - なぜその既定値・モデル・手順になったかが `DECISIONS.md` に残っている。
 - 次にやることが `NEXT_ACTIONS.md` で分かる。
 - 失敗や未評価の出力が、次の改善ループへ戻る。
+- 再利用できる運用教訓が `references/` に成文化され、session memory に閉じない。

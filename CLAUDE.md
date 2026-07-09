@@ -8,6 +8,7 @@ The runtime itself is tool-agnostic: all execution goes through `project.yaml` a
 - `README.md` or `README.ja.md`
 - `SKILL.md`
 - `references/interactive-questions.md`
+- `references/lesson-codification.md` when promoting run learnings into tracked docs
 
 ## Required Local Setup
 

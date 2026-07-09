@@ -31,6 +31,7 @@ Reads:
 
 - `references/model-routing.md`
 - `references/model-support.md`
+- `references/credit-estimation.md`
 - `CHECKS.md`
 
 Outputs:
@@ -38,7 +39,7 @@ Outputs:
 - selected workflow
 - selected model candidates
 - reason
-- credit / slot risk note
+- credit / slot risk note using job counts plus `references/credit-estimation.md`
 
 ## Prompt Designer
 
@@ -100,6 +101,8 @@ Owns:
 Reads:
 
 - `references/pixverse-best-practices.md`
+- `references/exit-codes.md`
+- `references/credit-estimation.md`
 - `templates/cli-batch-plan.md`
 - `templates/qc-report.md`
 
@@ -143,6 +146,7 @@ Reads:
 
 - `CHECKS.md`
 - `references/final-video-qa-gate.md`
+- `references/lesson-codification.md`
 - `templates/qc-report.md`
 
 Outputs:
@@ -151,6 +155,7 @@ Outputs:
 - manifest and MP4 evidence
 - cut-by-cut notes
 - regenerate / accept decision
+- optional public-safe lesson candidates for `references/`
 
 ## CPP Publisher
 

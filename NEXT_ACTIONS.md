@@ -22,10 +22,29 @@ Owner: human
 Why:
 
 - `VISION.md` / `CHECKS.md` / `LOOPS.md` / `DECISIONS.md` / `NEXT_ACTIONS.md` and the expanded `AGENTS.md` should match how this OSS repo will actually be used.
+- Loop 10 and `references/lesson-codification.md` now define how run lessons promote into `references/`.
 
 Done when:
 
 - Human approves the direction or requests corrections.
+
+### 1b. Calibrate credit-estimation after next measured full run
+
+Status: doing
+
+Owner: agent after human-approved generation
+
+Why:
+
+- First Loop 10 pass calibrated:
+  - `v6` 720p with audio = `10 cr / sec`
+  - `pixverse-c1` 720p no audio = `8 cr / sec`
+  - `create extend` `v6` 720p with audio = `10 cr / sec`
+- Still provisional: image generation, `create voice`, upscale, 1080p bands, third-party video models.
+
+Done when:
+
+- Remaining provisional rows have public-safe measured calibration, or are explicitly marked unmeasured after a deliberate check.
 
 ### 2. Keep content operations optional
 

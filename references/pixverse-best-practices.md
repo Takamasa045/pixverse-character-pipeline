@@ -16,11 +16,21 @@ CLI production should run in this order:
 2. Route to one CLI command family.
 3. Pick the model and mode constraints.
 4. Write prompt files, not only inline strings.
-5. Check account / slots for batch work.
+5. Check account / slots for batch work and estimate credits with `references/credit-estimation.md`.
 6. Submit with `--json`, `--no-wait`, and idempotency keys.
 7. Wait / batch-status / download assets.
 8. Run machine QA and visual QA.
 9. Accept, regenerate, extend, upscale, or discard.
+10. Promote reusable lessons into `references/` via `references/lesson-codification.md`. Do not leave durable rules only in chat or raw run logs.
+
+## Operational Truth Sources
+
+- Model table: `references/model-support.md`
+- Routing intent: `references/model-routing.md`
+- Credit planning / calibration: `references/credit-estimation.md`
+- Exit / retry contract: `references/exit-codes.md`
+- Acceptance gate: `references/final-video-qa-gate.md`
+- Lesson promotion pattern: `references/lesson-codification.md`
 
 ## Universal CLI Rules
 
@@ -321,19 +331,35 @@ Machine QA:
 - asset IDs and downloaded paths recorded
 - duration, resolution, FPS, audio stream checked
 - black frame / silence checked where relevant
+- audio loudness checked; "track exists" is not enough
 - failed IDs and exact errors recorded
 
 Visual QA:
 
-- character identity
-- prop shape
-- action legibility
+- character identity, not just gear colors
+- prop shape and shared-object continuity
+- action legibility and cause/effect
+- physical scale claims readable without text
 - camera motion
 - caption readability
 - sound fit
 - request fit
 
+Pre-credit practices:
+
+- write per-cut acceptance criteria before generation
+- use a local previs / contact sheet for multi-cut stories when cut roles are unclear
+- estimate credits with `references/credit-estimation.md`
+- keep rejected white-flash or artifact clips as evidence, but do not accept them
+
 Regeneration should target one named failure. If the problem is a story or offer problem, rewrite the brief/shotlist before changing models.
+
+Regeneration economics:
+
+- regenerate only failed cuts when possible
+- do not upscale or polish rejected material
+- prefer local-only audio, foley, caption, or telop repair when the picture already passes
+- promote reusable failures into `references/` through `references/lesson-codification.md`
 
 ## Sources
 

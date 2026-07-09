@@ -93,6 +93,7 @@ pixverse asset download ...
 - dry-run manifest の `status` が `planned`。
 - 出力予定パスが `output/<project-slug>/<run-id>/` に集約される。
 - failed / skipped がある場合、exact error を残す。
+- credit risk を `references/credit-estimation.md` で概算し、job count だけの説明で止めない。
 
 ## Render Output QA
 
@@ -105,6 +106,7 @@ local render または full run の後に確認する。
 - duration が clips の合計と大きくズレていない。
 - video / image / bgm assets が staging にコピーされている。
 - failed variant がある場合は `NEXT_ACTIONS.md` に戻す。
+- 再利用できる運用教訓がある場合は Loop 10 / `references/lesson-codification.md` で `references/` に成文化する。
 
 ## Character Reference QA
 
@@ -113,8 +115,12 @@ local render または full run の後に確認する。
 - 参照画像と候補クリップの contact sheet を横並びで確認した。
 - 顔、体格、髪型、衣装、持ち物、主要な色が参照キャラクターから大きく外れていない。
 - 別の年齢・性別・体格・髪色・衣装・人物種別に変わった場合は、動作や背景が正しくても FAIL とする。
+- 装備色だけ似ていて顔・体型・シルエットが違う場合も FAIL とする。
 - ストーリー上の因果、背景連続性、テロップ、音声だけで PASS にしない。
+- 物理クレーム（高低差、作業難度、距離）がテロップ無しでも読める。
+- 主要アクションに before / contact / after が見える。
 - 採用レビューには「何が参照一致しているか」と「許容した差分」を短く残す。
+- 詳細な hard-fail と audio threshold は `references/final-video-qa-gate.md` を正とする。
 
 ## Runtime Code Check
 

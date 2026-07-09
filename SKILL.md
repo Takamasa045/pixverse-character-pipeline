@@ -51,6 +51,9 @@ metadata:
 11. **PixVerse CLI 1.2.7 では reference も `v6` 対応** — `generation.model` と `generation.referenceModel` の既定はどちらも `v6`。C1 寄りの reference 表現が必要なときだけ `pixverse-c1` に上書きする
 12. **モデル表は `references/model-support.md` を見る** — CLI README と公式 skill の表を突き合わせた repo-local source of truth
 13. **CLI制作ルーティングは `references/model-routing.md` を見る** — PixVerse CLI の command family、model candidate、batch、post-process、audio、QC を先に選ぶ
+14. **クレジット見積もりは `references/credit-estimation.md` を見る** — job count だけでなく、承認前に概算クレジット帯を報告する
+15. **retry / exit 契約は `references/exit-codes.md` を見る** — timeout / auth / credit / generation / validation の扱いを揃える
+16. **再利用できる教訓は `references/` に成文化する** — session memory や raw run log に閉じ込めない（→ `references/lesson-codification.md`）
 
 ---
 
@@ -465,6 +468,10 @@ Remotion staging assets → `remotion/public/.pipeline/`
 - `references/model-support.md` — PixVerse CLI / 公式 skill 由来の最新モデル表
 - `references/model-routing.md` — 目的別の workflow / model candidate / optional surface の選び方
 - `references/pixverse-best-practices.md` — CLI command family / V6 / C1 candidate / batch / asset / audio / regeneration の実務メモ
+- `references/credit-estimation.md` — job count と stage 別クレジット概算、実測較正ルール
+- `references/exit-codes.md` — PixVerse CLI exit code と retry / stop 契約
+- `references/lesson-codification.md` — run の教訓を `references/` に成文化するパターン
+- `references/final-video-qa-gate.md` — 生成完了と採用判定を分ける QA gate
 - `agents/pixverse-production-agents.md` — Coordinator / Model Router / Prompt Designer / QC などの役割分担
 - `references/pipeline-diagram.md` — パイプライン Mermaid フローチャート + ジョブ数計算式
 - `references/manifest-schema.md` — Creative / Pipeline 両 manifest の JSON スキーマ

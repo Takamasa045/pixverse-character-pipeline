@@ -376,6 +376,7 @@ Status:
 - `CHECKS.md`
 - `DECISIONS.md`
 - `NEXT_ACTIONS.md`
+- `references/lesson-codification.md`
 - relevant manifest
 
 手順:
@@ -386,18 +387,21 @@ Status:
 4. `Human Eval pending` や failed output を探す。
 5. 技術修正、docs 修正、sample 生成、公開準備に分類する。
 6. public-safe な要約だけを `NEXT_ACTIONS.md` に 1-5 個の具体タスクとして戻す。
-7. external contributor に依頼できる粒度になったら GitHub Issue 化を検討する。
+7. 再利用できる運用教訓がある場合は Loop 10 へ進む。
+8. external contributor に依頼できる粒度になったら GitHub Issue 化を検討する。
 
 出力:
 
 - short review summary
 - updated next actions
 - optional decision entry
+- optional handoff to Loop 10
 
 完了条件:
 
 - 未評価 run が放置されていない。
 - 次の一手が public-safe な形で repo 内または GitHub Issues に残る。
+- 再利用可能な教訓を `NEXT_ACTIONS` だけで終わらせず、Loop 10 の対象にしたか判断している。
 
 人間確認:
 
@@ -424,6 +428,8 @@ Status:
 - `references/model-routing.md`
 - `references/pixverse-best-practices.md`
 - `references/model-support.md`
+- `references/credit-estimation.md`
+- `references/exit-codes.md`
 - `agents/pixverse-production-agents.md`
 - `CHECKS.md`
 
@@ -433,10 +439,11 @@ Status:
 2. Model Router が primary command family と fallback command family を選ぶ。
 3. 必要なら `templates/brief.md`、`templates/shotlist.yaml`、`templates/cli-batch-plan.md` を作る。
 4. pipeline で扱う場合だけ `project.yaml` に落とす。
-5. `validate` と `plan` で job count と credit risk を確認する。
+5. `validate` と `plan` で job count を確認し、`references/credit-estimation.md` で credit risk を概算する。
 6. full `run` は明示承認後にだけ進める。
 7. 生成後は `references/final-video-qa-gate.md` と `templates/qc-report.md` で採用判断を分ける。
 8. QA を通った場合だけ post package や downstream edit に進む。
+9. 再利用できる運用教訓があれば Loop 10 で `references/` を更新する。
 
 出力:
 
@@ -457,3 +464,60 @@ Status:
 
 - 生成 credit を使ってよいか。
 - どの出力を採用し、どれを再生成するか。
+
+## Loop 10: Lesson Codification into `references/`
+
+用途:
+
+- run / dry-run / QA / CLI 実測から得た教訓を、session memory ではなく tracked `references/` に成文化する。
+- Shotpack の「実測 → references を較正する」パターンをこの repo でも回す。
+
+入力:
+
+- completed or failed run evidence under ignored `output/`
+- exact error strings
+- measured credit deltas or per-job `cost_credits`
+- QA hard-fail notes
+- CLI help / model support changes
+
+読むファイル:
+
+- `references/lesson-codification.md`
+- `references/credit-estimation.md`
+- `references/exit-codes.md`
+- `references/model-support.md`
+- `references/model-routing.md`
+- `references/pixverse-best-practices.md`
+- `references/prompt-library.md`
+- `references/final-video-qa-gate.md`
+- `DECISIONS.md`
+- `CHECKS.md`
+
+手順:
+
+1. 学びを 1 文で一般化する。固有 path、client 名、account state は落とす。
+2. Destination Map で書き先を決める。
+3. 既存 reference と重複しないか確認する。完全重複なら破棄する。
+4. public-safe な rule / table / checklist として追記または修正する。
+5. クレジット較正なら `references/credit-estimation.md` の対象行だけ直す。
+6. retry / exit 契約なら `references/exit-codes.md` を直す。
+7. モデル表変更なら Loop 5 と合わせて `references/model-support.md` を直す。
+8. 方針変更が残るなら `DECISIONS.md` に 1 entry を追記する。
+9. 未完了タスクだけ `NEXT_ACTIONS.md` に残す。raw log は tracked に昇格しない。
+
+出力:
+
+- updated `references/*`
+- optional `DECISIONS.md` entry
+- optional `NEXT_ACTIONS.md` cleanup
+
+完了条件:
+
+- 再利用可能な教訓が、正しい truth source に残っている。
+- private account / path / campaign detail が tracked docs に入っていない。
+- 次のエージェントが raw log を読まなくても同じ失敗を避けられる。
+
+人間確認:
+
+- その教訓が public OSS に残してよいか。
+- 1 回限りの例外を一般化しすぎていないか。

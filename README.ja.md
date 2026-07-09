@@ -100,6 +100,9 @@ HyperFrames か Remotion の編集 project として続きから触れるよう�
 - model / workflow の選び方は [`references/model-routing.md`](./references/model-routing.md)
 - PixVerse CLI の model support は [`references/model-support.md`](./references/model-support.md)
 - PixVerse 制作の実務メモは [`references/pixverse-best-practices.md`](./references/pixverse-best-practices.md)
+- クレジット概算は [`references/credit-estimation.md`](./references/credit-estimation.md)
+- retry / exit 契約は [`references/exit-codes.md`](./references/exit-codes.md)
+- run の教訓を references に戻す手順は [`references/lesson-codification.md`](./references/lesson-codification.md)
 - エージェント分担は [`agents/pixverse-production-agents.md`](./agents/pixverse-production-agents.md)
 
 ここでは PixVerse CLI に専念します。runtime の中心は引き続き `project.yaml` -> `validate` -> `plan` -> `run --dry-run` / 承認後 `run` / local `render` です。直接 PixVerse CLI を使う場合も、credit 境界と QA gate は同じです。

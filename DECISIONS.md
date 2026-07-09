@@ -26,6 +26,76 @@ Follow-up:
 - ...
 ```
 
+## 2026-07-09 - Codify reusable lessons into `references/`
+
+Status: accepted
+
+Decision:
+
+- Adopt the Shotpack pattern: reusable operational lessons are written into tracked `references/`, not left only in chat, private memory, or raw `output/runs/`.
+- Add `references/credit-estimation.md` for planning estimates and post-run calibration.
+- Add `references/exit-codes.md` for timeout / auth / credit / generation / validation handling.
+- Add `references/lesson-codification.md` plus Loop 10 as the promotion workflow.
+- Keep `references/model-support.md` as the only model table. Do not split a second model matrix into `model-constraints.md`.
+- Keep unfinished work in `NEXT_ACTIONS.md` and durable policy changes in `DECISIONS.md`.
+
+Reason:
+
+- Shotpack already treats measured credit rows, exit contracts, and model limits as source-of-truth references that agents recalibrate after real runs.
+- Character pipeline had strong run-review docs, but durable operational knowledge still risked staying in session notes.
+- OSS safety still applies: promote generalized rules, never account balances, private paths, or raw logs.
+
+Impacted files:
+
+- `references/credit-estimation.md`
+- `references/exit-codes.md`
+- `references/lesson-codification.md`
+- `LOOPS.md`
+- `AGENTS.md`
+- `SKILL.md`
+- `CHECKS.md`
+- `VISION.md`
+- `agents/pixverse-production-agents.md`
+- `references/pixverse-best-practices.md`
+
+Follow-up:
+
+- After the next measured full run, calibrate remaining provisional rows in `references/credit-estimation.md` using public-safe per-job costs.
+- If pipeline runtime gains exact credit estimation, replace the job-count-only preflight with that estimate while keeping this table for planning.
+
+## 2026-07-09 - First Loop 10 calibration from local run evidence
+
+Status: accepted
+
+Decision:
+
+- Calibrate `references/credit-estimation.md` with measured job payload rates:
+  - `v6` 720p with audio: `10 cr / sec`
+  - `pixverse-c1` 720p no audio: `8 cr / sec`
+  - `create extend` `v6` 720p with audio: `10 cr / sec`
+- Expand `references/final-video-qa-gate.md` with identity-vs-gear, scale-without-text, action causality, audio loudness thresholds, pre-credit gate, and common fix map.
+- Expand `references/prompt-library.md` with production lessons for identity anchors, scale markers, action causality, category negatives, reference lock, start-frame design, and no burned-in text.
+- Keep source evidence in ignored `output/`; promote only generalized public-safe rules.
+
+Reason:
+
+- Local QA and create payloads already contained reusable lessons and measured costs.
+- Waiting for a new paid run would leave agents repeating known failures.
+- Account balances and private paths stay out of tracked docs.
+
+Impacted files:
+
+- `references/credit-estimation.md`
+- `references/final-video-qa-gate.md`
+- `references/prompt-library.md`
+- `references/pixverse-best-practices.md`
+- `CHECKS.md`
+- `NEXT_ACTIONS.md`
+
+Follow-up:
+
+- Still provisional: image generation, `create voice`, upscale, 1080p bands, and third-party video models.
+
 ## 2026-07-04 - Upgrade runtime wrappers to PixVerse CLI 1.2.x
 
 Status: accepted

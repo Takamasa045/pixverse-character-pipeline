@@ -31,6 +31,7 @@ Use this loop for non-trivial work:
 5. Use `CHECKS.md` before validation, dry-run, render, submission, or PixVerse generation.
 6. Record lasting decisions in `DECISIONS.md`.
 7. Record unresolved follow-ups in `NEXT_ACTIONS.md`.
+8. When a run yields a reusable operational lesson, codify it into `references/` via Loop 10. Do not leave durable rules only in chat or private memory.
 
 Do not turn every small task into heavy process. For a typo or a narrow docs fix, read the relevant file, patch it, and report the result.
 
@@ -38,9 +39,10 @@ Do not turn every small task into heavy process. For a typo or a narrow docs fix
 
 - `VISION.md`: project purpose, audience, values, scope, and success definition.
 - `CHECKS.md`: pre-flight, dry-run, render, public submission, and PixVerse credit checks.
-- `LOOPS.md`: repeatable workflows for announcement videos, reference stories, local render, CLI refresh, submission, content repurposing, and run review.
+- `LOOPS.md`: repeatable workflows for announcement videos, reference stories, local render, CLI refresh, submission, content repurposing, run review, and lesson codification.
 - `DECISIONS.md`: append-only record of decisions that should survive the current session.
 - `NEXT_ACTIONS.md`: current backlog and blocked items for the next agent or human operator.
+- `references/`: public-safe operational truth. Prefer updating these over accumulating private session notes.
 
 Update these files only when the change is meant to affect future sessions. Keep temporary notes in the final response or ignored `output/` files.
 
@@ -48,6 +50,7 @@ Update these files only when the change is meant to affect future sessions. Keep
 
 - Do not commit PixVerse account data, tokens, credit balances, private paths, or private client/event details.
 - Do not promote raw `output/` or `output/runs/` logs into tracked docs without summarizing and removing private context.
+- Promote reusable lessons into `references/` as generalized rules, tables, or checklists. Keep unfinished work in `NEXT_ACTIONS.md`.
 - Keep `NEXT_ACTIONS.md` public-safe. Use GitHub Issues for external collaboration when an item becomes a real public task.
 - Keep content repurposing loops optional and generalized; this repo's core is the PixVerse character pipeline.
 - When in doubt, prefer generic examples and neutral fixtures.
@@ -88,8 +91,11 @@ pixverse auth login
 - Safe to run before approval: `validate`, `plan`, `run --dry-run`, and local-only `render`.
 - Requires explicit user approval: `run` without `--dry-run`, because it can submit PixVerse jobs and consume credits.
 - Before batch generation, report planned variants, image/base/reference/voice/upscale job counts, and any obvious credit or slot risk.
+- Use `references/credit-estimation.md` for planning estimates. Runtime still uses a coarse job-count gate; agents must report the better estimate before approval.
 - Full `run` passes deterministic PixVerse `--idempotency-key` values scoped by project/run-id/variant/stage to reduce duplicate credit spend on retries.
+- Retry and exit handling for direct CLI work follows `references/exit-codes.md`.
 - Never run PixVerse generation just to verify documentation changes.
+- After a substantial run, use Loop 10 / `references/lesson-codification.md` to calibrate credit rows, exit handling, prompt rules, or QA hard-fails when the learning is reusable.
 
 ## Recommended Sub-Agent Split
 
@@ -115,9 +121,11 @@ When a run or dry-run finishes, report:
 
 - Config path and run-id
 - Variant count and job counts
+- Credit estimate from `references/credit-estimation.md` when generation is involved
 - Output root and final MP4 paths, when rendered
 - `manifest.json` path
 - Any failed/skipped variant and exact error string
+- Any reusable lesson promoted into `references/`
 
 When documentation or operating files change, report:
 
@@ -125,6 +133,7 @@ When documentation or operating files change, report:
 - Whether PixVerse generation was avoided
 - Verification performed, or why it was not needed
 - Any follow-up added to `NEXT_ACTIONS.md`
+- Any lesson codified into `references/`
 
 ## Tool Notes
 

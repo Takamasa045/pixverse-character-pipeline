@@ -71,6 +71,8 @@ A talking character derived from the provided character image, speaking directly
 - 1カットにつき1つの明確な動きだけに絞る
 - 背景変化も1つ書く
 - カメラワークは毎カット変える
+- 顔・体型・眼鏡・衣装・主要プロップなどの identity anchors を毎回繰り返す
+- 尺や高低差などの物理クレームは、テロップではなく画面内マーカーで示す
 
 4ビートの基本形:
 1. `hook` — 世界観と異変の導入
@@ -169,10 +171,100 @@ An animated character derived from the provided character image, lively pose in 
 An animated character derived from the provided character image, in vertical portrait frame, cheerful expression, slight head tilt, soft lighting, photoreal urban background blended with character art, upper body close-up, character showcase
 ```
 
+## Production Lessons
+
+These rules come from repeated paid-run QA failures. Promote more only through `references/lesson-codification.md`.
+
+### Identity anchors
+
+Write the stable traits every cut, not only in cut 1:
+
+```text
+same character from the reference image, [body type], [face shape], [glasses or key face trait],
+[helmet/hair], [jacket], [pants], [gloves/boots], [signature prop]
+```
+
+Fail pattern: gear colors match, but body type / face / proportions drift. That is still a character fail.
+
+### Physical scale claims
+
+If the request needs height, distance, or difficulty to be obvious:
+
+```text
+road far below, drainage ditch or curb visible, top edge and bottom edge of the embankment visible,
+worker halfway up a steep wall-like slope
+```
+
+Do not rely on overlay text such as `3m+` to carry the claim.
+
+### Action causality
+
+Write start state, contact, and end state in one shot:
+
+```text
+uncut dense weeds in front of the blade, blade half-hidden in stems,
+cut weeds and fallen stems immediately behind the sweep, boots planted on the slope
+```
+
+Avoid:
+
+- bare-soil scraping presented as cutting
+- walking-slide motion when bracing is required
+- extreme oversized foreground tools that hide the action
+
+### Category negatives
+
+Name the wrong class explicitly when drift is common:
+
+```text
+irregular roadside broadleaf weeds and vine tangles,
+not rice, not wheat, not crop rows, not paddy plants, not ornamental grain heads
+```
+
+Horror / junk creature example:
+
+```text
+unsettling practical-effect junk creatures, not cute, not mascot
+```
+
+### Continuity and reference lock
+
+When two cuts share the same pile, doorway, prop, or location:
+
+- reuse the same reference still or previous accepted frame when possible
+- restate the shared object identity in both prompts
+- do not introduce a cleaner or different prop "for variety"
+
+### Start-frame design for I2V / reference stills
+
+If the motion is "open", "spray", "cut", or "transform", do not start from the finished state.
+
+- half-open door / half-sprayed surface / blade just entering weeds
+- the first frame should leave room for the action to happen
+
+### No burned-in text
+
+Keep readable copy out of visual prompts:
+
+```text
+empty frame area for later caption, no signs, no letters, no subtitles generated inside the video
+```
+
+Put titles, warnings, and CTA into Remotion overlays instead.
+
+### Regeneration prompt loop
+
+1. Name one failed criterion.
+2. Keep identity anchors unchanged.
+3. Add one stronger constraint for the failed criterion.
+4. Add explicit negatives for the observed drift.
+5. Change model or command family only if the failure is structural.
+
 ## Notes
 
-- Keep prompts simple; 1-2 sentences is enough.
+- Keep prompts simple; 1-2 sentences is enough for simple talking-head clips, but action / continuity cuts may need 3-5 concrete constraints.
 - Do not put narration text into the visual prompt. The pipeline uses `create voice` or `audioFile` as separate narration audio assets.
 - Use `voiceId` only when you have confirmed a PixVerse preset voice ID. Legacy `ttsSpeaker` numbers are not PixVerse CLI 1.2 voice preset IDs.
 - If ratios need different framing, set `generation.prompt.perRatio`.
 - If the selling point is "character into realistic background", make the background explicit: `photoreal office`, `live-action studio`, `real-world city street`, etc.
+- Prefer local-only audio / caption repair when the picture already passes QA.
