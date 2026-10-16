@@ -7,7 +7,8 @@ import { runCommand } from "../lib/subprocess";
 
 const repoRoot = resolve(process.cwd(), "..");
 const outputRoot = resolve(repoRoot, "output");
-const pipelineBin = "./bin/pipeline";
+// The v3 runtime remains an explicit compatibility entry after production.v1 becomes default.
+const pipelineBin = "./bin/pipeline-legacy";
 
 const parseTrailingJson = (output: string) => {
   const normalized = output.trim();

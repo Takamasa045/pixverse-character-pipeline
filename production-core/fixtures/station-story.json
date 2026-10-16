@@ -1,0 +1,120 @@
+{
+  "schema_version": "production.v1",
+  "project_id": "station-story",
+  "revision": 1,
+  "context": {
+    "region": "global",
+    "workspace_id": "0"
+  },
+  "brief": {
+    "original": "この猫で、駅で友人を見つけて安心する20秒の短編。",
+    "intent": "不安から安心への変化を視線と編集で伝える",
+    "assumptions": [
+      "No dialogue requested"
+    ],
+    "deliveries": [
+      {
+        "id": "ja-wide",
+        "locale": "ja",
+        "aspect": "16:9",
+        "duration_ms": 20000,
+        "width": 640,
+        "height": 360
+      }
+    ]
+  },
+  "entities": [],
+  "assets": [],
+  "shots": [
+    {
+      "shot_id": "wait",
+      "purpose": "駅で待つ",
+      "prompt": "駅で待つ",
+      "edit_duration_ms": 4000,
+      "entry_state": {
+        "gaze": "platform",
+        "ticket_hand": "right"
+      },
+      "exit_state": {
+        "gaze": "platform",
+        "emotion": "anxious"
+      },
+      "camera": "wide",
+      "audio": {
+        "intent": "ambience"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "search",
+      "purpose": "相手を探す",
+      "prompt": "相手を探す",
+      "edit_duration_ms": 5000,
+      "entry_state": {
+        "gaze": "platform",
+        "ticket_hand": "right"
+      },
+      "exit_state": {
+        "gaze": "left",
+        "emotion": "anxious"
+      },
+      "camera": "medium pan",
+      "audio": {
+        "intent": "ambience"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "find",
+      "purpose": "相手を見つける",
+      "prompt": "相手を見つける",
+      "edit_duration_ms": 6000,
+      "entry_state": {
+        "gaze": "left",
+        "ticket_hand": "right"
+      },
+      "exit_state": {
+        "gaze": "friend",
+        "emotion": "relieved"
+      },
+      "camera": "eye-line closeup",
+      "audio": {
+        "intent": "ambience"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "meet",
+      "purpose": "再会する",
+      "prompt": "再会する",
+      "edit_duration_ms": 5000,
+      "entry_state": {
+        "gaze": "friend",
+        "ticket_hand": "right"
+      },
+      "exit_state": {
+        "emotion": "happy"
+      },
+      "camera": "two-shot",
+      "audio": {
+        "intent": "ambience"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    }
+  ],
+  "execution_policy": {
+    "allowed_scope": "planning_only",
+    "max_credits": null,
+    "max_attempts": 1
+  },
+  "timeline": {
+    "fps": 30,
+    "clips": [],
+    "audio": [],
+    "captions": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-10-16",
+  "purpose": "Offline contract regression; no media generation or quality validation",
+  "files": {
+    "create-video-v6.json": {"query": "pixverse capabilities create video --model v6 --json", "source": "Read-only installed Create capability capture", "cli_version": "1.4.8"},
+    "create-reference-v6.json": {"query": "pixverse capabilities create reference --model v6 --json", "source": "Read-only installed Create capability capture", "cli_version": "1.4.8"},
+    "create-image-nano.json": {"query": "pixverse capabilities create image --model gemini-nano-banana-2.1 --json", "source": "Read-only installed Create capability capture", "cli_version": "1.4.8"},
+    "create-voice-minimax.json": {"query": "pixverse capabilities create voice --model speech-2.8-hd --json", "source": "Installed CLI read-only query", "cli_version": "1.4.8"},
+    "canvas-seedance25.json": {"query": "pixverse capabilities canvas --node-type video_generate --model seedance-2.5 --json", "source": "Read-only live Canvas capability capture", "cli_version": "1.4.8"}
+  },
+  "official_skills_commit": "6f2c5641031f3d3bd2e54db5280dec735ce94eb3",
+  "official_cli_commit": "86d5ec07f33c7ab8e503019b8f6161f698e042a0"
+}

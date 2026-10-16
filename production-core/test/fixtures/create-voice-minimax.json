@@ -1,0 +1,265 @@
+{
+  "schema_version": "pixverse_create_capability_query.v1",
+  "source": "bundled",
+  "query": {
+    "mode": "voice",
+    "model": "speech-2.8-hd"
+  },
+  "capability": {
+    "capability_id": "create.voice",
+    "command": "pixverse create voice",
+    "description": "Generate speech audio from text.",
+    "default_model": "speech-2.8-hd",
+    "parameters": {
+      "text": {
+        "flag": "--text",
+        "type": "text",
+        "required": true,
+        "accepts": [
+          "literal",
+          "local_file",
+          "stdin"
+        ],
+        "on_invalid": "reject",
+        "description": "Text to synthesize.",
+        "min_length": 1
+      },
+      "model": {
+        "flag": "--model",
+        "type": "string",
+        "required": false,
+        "default": "speech-2.8-hd",
+        "enum": [
+          "speech-2.8-hd"
+        ],
+        "on_invalid": "reject",
+        "description": "Voice model."
+      },
+      "voice_id": {
+        "flag": "--voice-id",
+        "type": "string",
+        "required": false,
+        "on_invalid": "backend",
+        "description": "PixVerse preset voice identifier."
+      },
+      "provider_voice_id": {
+        "flag": "--provider-voice-id",
+        "type": "string",
+        "required": false,
+        "on_invalid": "backend",
+        "description": "Provider-native voice identifier."
+      },
+      "language": {
+        "flag": "--language",
+        "type": "string",
+        "required": false,
+        "default": "auto",
+        "on_invalid": "backend",
+        "description": "Language code; auto omits the provider language field.",
+        "supported": true
+      },
+      "stability": {
+        "flag": "--stability",
+        "type": "number",
+        "required": false,
+        "on_invalid": "reject",
+        "description": "ElevenLabs voice stability.",
+        "supported": false
+      },
+      "similarity_boost": {
+        "flag": "--similarity-boost",
+        "type": "number",
+        "required": false,
+        "on_invalid": "reject",
+        "description": "ElevenLabs similarity boost.",
+        "supported": false
+      },
+      "style": {
+        "flag": "--style",
+        "type": "number",
+        "required": false,
+        "on_invalid": "reject",
+        "description": "Eleven Multilingual v2 style strength.",
+        "supported": false
+      },
+      "use_speaker_boost": {
+        "flag": "--use-speaker-boost / --no-use-speaker-boost",
+        "type": "boolean",
+        "required": false,
+        "on_invalid": "reject",
+        "description": "Eleven Multilingual v2 speaker boost.",
+        "supported": false
+      },
+      "speed": {
+        "flag": "--speed",
+        "type": "number",
+        "required": false,
+        "default": 1,
+        "unit": "multiplier",
+        "on_invalid": "reject",
+        "description": "Provider-specific speech speed.",
+        "min": 0.5,
+        "max": 2
+      },
+      "volume": {
+        "flag": "--volume",
+        "type": "number",
+        "required": false,
+        "min": 0,
+        "max": 10,
+        "on_invalid": "reject",
+        "description": "MiniMax volume.",
+        "supported": true,
+        "default": 1
+      },
+      "pitch": {
+        "flag": "--pitch",
+        "type": "number",
+        "required": false,
+        "min": -12,
+        "max": 12,
+        "unit": "semitones",
+        "on_invalid": "reject",
+        "description": "MiniMax pitch adjustment.",
+        "supported": true,
+        "default": 0
+      },
+      "emotion": {
+        "flag": "--emotion",
+        "type": "string",
+        "required": false,
+        "enum": [
+          "auto",
+          "happy",
+          "sad",
+          "angry",
+          "fearful",
+          "disgusted",
+          "surprised",
+          "calm",
+          "fluent",
+          "whisper"
+        ],
+        "on_invalid": "reject",
+        "description": "MiniMax emotion preset.",
+        "supported": true,
+        "default": "auto"
+      },
+      "client_request_id": {
+        "flag": "--client-request-id",
+        "type": "string",
+        "required": false,
+        "description": "Caller-side request identifier."
+      },
+      "output": {
+        "flag": "--output",
+        "type": "string",
+        "required": false,
+        "description": "File or directory for the completed download. Existing files are never overwritten."
+      },
+      "wait": {
+        "flag": "--no-wait",
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "description": "Wait for the generated asset unless disabled."
+      },
+      "timeout": {
+        "flag": "--timeout",
+        "type": "integer",
+        "required": false,
+        "default": 300,
+        "min": 1,
+        "unit": "seconds",
+        "on_invalid": "reject",
+        "description": "Polling timeout when waiting for completion."
+      },
+      "json": {
+        "flag": "--json",
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "Write pure JSON to stdout."
+      }
+    },
+    "models": {
+      "speech-2.8-hd": {
+        "id": "speech-2.8-hd",
+        "display_name": "MiniMax Speech 2.8 HD",
+        "default": true,
+        "metadata": {
+          "provider": "minimax"
+        },
+        "parameters": {
+          "language": {
+            "supported": true,
+            "on_invalid": "backend"
+          },
+          "stability": {
+            "supported": false,
+            "on_invalid": "reject"
+          },
+          "similarity_boost": {
+            "supported": false,
+            "on_invalid": "reject"
+          },
+          "style": {
+            "supported": false,
+            "on_invalid": "reject"
+          },
+          "use_speaker_boost": {
+            "supported": false,
+            "on_invalid": "reject"
+          },
+          "speed": {
+            "min": 0.5,
+            "max": 2,
+            "default": 1
+          },
+          "volume": {
+            "supported": true,
+            "min": 0,
+            "max": 10,
+            "default": 1
+          },
+          "pitch": {
+            "supported": true,
+            "min": -12,
+            "max": 12,
+            "default": 0
+          },
+          "emotion": {
+            "supported": true,
+            "enum": [
+              "auto",
+              "happy",
+              "sad",
+              "angry",
+              "fearful",
+              "disgusted",
+              "surprised",
+              "calm",
+              "fluent",
+              "whisper"
+            ],
+            "default": "auto"
+          }
+        }
+      }
+    },
+    "rules": [
+      {
+        "id": "voice-required",
+        "description": "Either voice_id or provider_voice_id is required.",
+        "when": {
+          "always": true
+        }
+      }
+    ],
+    "runtime_discovery": [
+      "pixverse voice models --json",
+      "pixverse voice presets --model <id> --json"
+    ],
+    "selected_model": "speech-2.8-hd"
+  }
+}

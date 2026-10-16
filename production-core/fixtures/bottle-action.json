@@ -1,0 +1,104 @@
+{
+  "schema_version": "production.v1",
+  "project_id": "bottle-action",
+  "revision": 1,
+  "context": {
+    "region": "global",
+    "workspace_id": "0"
+  },
+  "brief": {
+    "original": "このボトルを手に取り、ふたを開け、机に置く12秒。形とロゴを保つ。",
+    "intent": "商品形状と動作因果を伝える",
+    "assumptions": [
+      "Use actual product/logo footage if exact text preservation is mandatory"
+    ],
+    "deliveries": [
+      {
+        "id": "product-wide",
+        "locale": "ja",
+        "aspect": "16:9",
+        "duration_ms": 12000,
+        "width": 640,
+        "height": 360
+      }
+    ]
+  },
+  "entities": [],
+  "assets": [],
+  "shots": [
+    {
+      "shot_id": "pick",
+      "purpose": "商品を持つ",
+      "prompt": "商品を持つ",
+      "edit_duration_ms": 3000,
+      "entry_state": {
+        "bottle": "closed",
+        "hand": "right",
+        "surface": "desk"
+      },
+      "exit_state": {
+        "bottle": "held",
+        "cap": "attached"
+      },
+      "camera": "wide",
+      "audio": {
+        "intent": "silent"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "open",
+      "purpose": "ふたを開ける",
+      "prompt": "ふたを開ける",
+      "edit_duration_ms": 5000,
+      "entry_state": {
+        "bottle": "closed",
+        "hand": "right",
+        "surface": "desk"
+      },
+      "exit_state": {
+        "bottle": "open",
+        "cap": "left of bottle"
+      },
+      "camera": "medium pan",
+      "audio": {
+        "intent": "silent"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "place",
+      "purpose": "机に置く",
+      "prompt": "机に置く",
+      "edit_duration_ms": 4000,
+      "entry_state": {
+        "bottle": "closed",
+        "hand": "right",
+        "surface": "desk"
+      },
+      "exit_state": {
+        "bottle": "on desk",
+        "cap": "left of bottle"
+      },
+      "camera": "eye-line closeup",
+      "audio": {
+        "intent": "silent"
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    }
+  ],
+  "execution_policy": {
+    "allowed_scope": "planning_only",
+    "max_credits": null,
+    "max_attempts": 1
+  },
+  "timeline": {
+    "fps": 30,
+    "clips": [],
+    "audio": [],
+    "captions": []
+  }
+}
