@@ -810,3 +810,15 @@ test('an explicitly disallowed black interval blocks before publishing a complet
   assert.deepEqual(await fs.readdir(outputDir), []);
   assert.equal(await fileHash(image), takes[0].sha256);
 });
+
+// Accepted media still requires an explicit current shot adoption.
+test('delivery refuses accepted timeline take when shot adoption is missing or different', async () => {
+  for (const adoption of [undefined, 'another-take']) {
+    const { production, takes } = await fixture();
+    if (adoption === undefined) delete production.shots[0].take_id;
+    else production.shots[0].take_id = adoption;
+    const result = await inspectDelivery(production, takes);
+    assert.equal(result.ok, false);
+    assert.ok(result.issues.some((i) => i.code === 'ADOPTED_TAKE_MISMATCH'));
+  }
+});

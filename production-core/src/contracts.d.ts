@@ -141,8 +141,9 @@ export interface EditTimeline {
   fps: number;
   clips: {
     shot_id: string;
-    take_id: string;
-    source_in_ms: number;
+    /** Optional in a planning card; required, explicitly adopted, for delivery. */
+    take_id?: string;
+    source_in_ms?: number;
     duration_ms: number;
     audio?: boolean;
     volume?: number;
@@ -178,7 +179,7 @@ export interface Production {
       duration_ms: number;
       width?: number;
       height?: number;
-      timeline?: EditTimeline;
+      timeline?: Partial<EditTimeline>;
       caption_mode?: 'off' | 'sidecar' | 'burn_in' | 'both';
       caption_style?: CaptionStyle;
       qc?: QualityPolicy;
@@ -234,4 +235,17 @@ export interface QualityPolicy {
   max_silence_interval_ms?: number;
   min_mean_volume_db?: number;
   max_peak_volume_db?: number;
+}
+
+export interface ProductionValidationOptions {
+  phase?: 'planning' | 'delivery';
+  variantIds?: string[];
+}
+export interface ProductionValidationResult {
+  valid: boolean;
+  phase: 'planning' | 'delivery';
+  errors: string[];
+  /** Document/edit structure only; local media and QA gates still apply. */
+  ready_for_delivery: boolean;
+  delivery_errors: string[];
 }

@@ -1,3 +1,4 @@
+import { submissionBoundary } from './submission.mjs';
 import { createHash } from 'node:crypto';
 import { cliRunner, withContext, validateCreateIntent } from './pixverse.mjs';
 import { downloadCanvasMedia } from './media-download.mjs';
@@ -613,26 +614,8 @@ export function createCanvasAdapter({
   downloadMedia,
   downloadOptions = {},
 } = {}) {
-  return {
-    validate(intent) {
-      const canvas = requestCanvas(intent);
-      return validateCanvasPatch(
-        canvas.patch,
-        canvas.capability_snapshot ??
-          intent.capability_snapshot ??
-          (typeof capabilities !== 'function' ? capabilities : undefined),
-        { project_id: canvas.project_id, context: intent.context },
-      );
-    },
-    async graph(intent) {
-      const canvas = requestCanvas(intent);
-      const response = await run(common(intent, ['graph', 'get', canvas.project_id]), {
-        context: intent.context,
-      });
-      if (!successful(response)) fail('Canvas graph read failed');
-      return clone(graphValue(response.raw));
-    },
-    async submit(intent) {
+  const boundary = submissionBoundary(
+    async (intent) => {
       const canvas = requestCanvas(intent);
       // Query Canvas itself; a Create registry reference never selects another backend.
       let snapshot = typeof capabilities === 'function' ? await capabilities(intent) : capabilities;
@@ -645,13 +628,11 @@ export function createCanvasAdapter({
         snapshot = response.raw;
       }
       const prepared = await prepareCanvasPatch(intent, { run, snapshot });
-      if (!prepared.valid)
-        return {
-          results: [],
-          exit_code: prepared.response.exit_code || 6,
-          error: 'Canvas dry-run rejected',
-          raw: prepared.response.raw,
-        };
+      if (!prepared.valid) fail('Canvas dry-run rejected; no patch applied or dispatch made');
+      return prepared;
+    },
+    async (intent, prepared) => {
+      const canvas = requestCanvas(intent);
       const applied = await applyCanvasPatch(intent, prepared, { run });
       if (!applied.applied)
         return {
@@ -682,6 +663,27 @@ export function createCanvasAdapter({
           dispatch_unconfirmed: true,
         });
       return result;
+    },
+  );
+  return {
+    ...boundary,
+    validate(intent) {
+      const canvas = requestCanvas(intent);
+      return validateCanvasPatch(
+        canvas.patch,
+        canvas.capability_snapshot ??
+          intent.capability_snapshot ??
+          (typeof capabilities !== 'function' ? capabilities : undefined),
+        { project_id: canvas.project_id, context: intent.context },
+      );
+    },
+    async graph(intent) {
+      const canvas = requestCanvas(intent);
+      const response = await run(common(intent, ['graph', 'get', canvas.project_id]), {
+        context: intent.context,
+      });
+      if (!successful(response)) fail('Canvas graph read failed');
+      return clone(graphValue(response.raw));
     },
     async status(intent, provider_id) {
       const canvas = requestCanvas(intent);

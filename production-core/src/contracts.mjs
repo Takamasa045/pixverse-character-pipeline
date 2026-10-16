@@ -26,11 +26,26 @@ export function fileHash(path) {
 export function requireValue(ok, message) {
   if (!ok) throw new Error(message);
 }
-export function validateProduction(p) {
+export const timelineItemMatches = (item, delivery) =>
+  (!item.delivery_id || item.delivery_id === delivery.id) &&
+  (!item.variant_id || item.variant_id === delivery.id) &&
+  (!item.locale || item.locale === delivery.locale);
+export const selectedTimeline = (production, delivery) =>
+  Object.fromEntries(
+    ['clips', 'audio', 'captions'].map((key) => [
+      key,
+      (key === 'captions' && delivery.caption_mode === 'off'
+        ? []
+        : (delivery.timeline?.[key] ?? production.timeline?.[key] ?? [])
+      ).filter((item) => timelineItemMatches(item, delivery)),
+    ]),
+  );
+export function validateProduction(p, { phase = 'planning', variantIds } = {}) {
   const errors = [];
   const check = (ok, msg) => {
     if (!ok) errors.push(msg);
   };
+  check(['planning', 'delivery'].includes(phase), 'phase must be planning or delivery');
   check(p?.schema_version === 'production.v1', 'schema_version must be production.v1');
   check(
     typeof p?.project_id === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(p.project_id),
@@ -118,6 +133,40 @@ export function validateProduction(p) {
     ids.add(job.shot_id);
     if (job.generation) generation(job.generation, job.shot_id);
   }
+  const deliveryErrors = [];
+  const ready = (ok, message) => {
+    if (!ok) deliveryErrors.push(message);
+  };
+  const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const positiveMs = (v) => Number.isSafeInteger(v) && v > 0;
+  const nonempty = (v) => typeof v === 'string' && v.trim().length > 0;
+  const timelineShape = (timeline, label, override = false) => {
+    check(object(timeline), `${label}: timeline object required`);
+    if (!object(timeline)) return;
+    if (!override || Object.hasOwn(timeline, 'fps'))
+      check(Number.isFinite(timeline.fps) && timeline.fps > 0, `${label}: positive fps required`);
+    for (const key of ['clips', 'audio', 'captions']) {
+      if (override && !Object.hasOwn(timeline, key)) continue;
+      check(Array.isArray(timeline[key]), `${label}: ${key} array required`);
+      if (Array.isArray(timeline[key]))
+        check(timeline[key].every(object), `${label}: ${key} entries must be objects`);
+    }
+    for (const c of Array.isArray(timeline.clips) ? timeline.clips : []) {
+      if (!object(c)) continue;
+      check(
+        (p?.shots ?? []).some((shot) => shot.shot_id === c.shot_id),
+        `${label}: unknown clip shot`,
+      );
+      check(positiveMs(c.duration_ms), `${label}: positive integer clip duration_ms required`);
+      if (Object.hasOwn(c, 'take_id')) check(nonempty(c.take_id), `${label}: invalid clip take_id`);
+      if (Object.hasOwn(c, 'source_in_ms'))
+        check(
+          Number.isSafeInteger(c.source_in_ms) && c.source_in_ms >= 0,
+          `${label}: invalid source_in_ms`,
+        );
+    }
+  };
+  timelineShape(p?.timeline, 'production');
   const total = (p?.shots ?? []).reduce((n, s) => n + s.edit_duration_ms, 0);
   const variants = new Set();
   for (const d of p?.brief?.deliveries ?? []) {
@@ -127,20 +176,47 @@ export function validateProduction(p) {
       typeof d.locale === 'string' && /^\d+:\d+$/.test(d.aspect ?? ''),
       'delivery locale/aspect required',
     );
-    // Locale-specific edit durations may be declared explicitly.
-    const selectedClips =
-      d.timeline?.clips ??
-      p.timeline?.clips?.filter(
-        (c) =>
-          (!c.locale || c.locale === d.locale) &&
-          (!c.variant_id || c.variant_id === d.id) &&
-          (!c.delivery_id || c.delivery_id === d.id),
+    check(positiveMs(d.duration_ms), `${d.id}: positive integer delivery duration_ms required`);
+    if (Object.hasOwn(d, 'timeline')) timelineShape(d.timeline, d.id, true);
+    if (variantIds && !variantIds.includes(d.id)) continue;
+    const source = d.timeline?.clips ?? p?.timeline?.clips;
+    const clips = Array.isArray(source)
+      ? source.filter((c) => object(c) && timelineItemMatches(c, d))
+      : [];
+    const unassembledPlan =
+      Array.isArray(p?.timeline?.clips) &&
+      p.timeline.clips.length === 0 &&
+      !Object.hasOwn(d.timeline ?? {}, 'clips');
+    if (unassembledPlan) {
+      // A planning estimate is not an assembled edit and cannot pass delivery validation.
+      check(
+        d.duration_ms === total,
+        `${d.id}: planned shot duration does not match requested duration`,
       );
-    const duration = selectedClips?.length
-      ? selectedClips.reduce((n, c) => n + c.duration_ms, 0)
-      : total;
-    check(d.duration_ms === duration, `${d.id}: edit duration does not match requested duration`);
+    } else {
+      check(clips.length > 0, `${d.id}: selected timeline must contain clips`);
+      const duration = clips.reduce((n, c) => n + c.duration_ms, 0);
+      check(d.duration_ms === duration, `${d.id}: edit duration does not match requested duration`);
+    }
+    ready(clips.length > 0, `${d.id}: selected timeline must contain clips for delivery`);
+    for (const c of clips) {
+      ready(nonempty(c.take_id), `${d.id}: clip take_id required for delivery`);
+      ready(
+        Number.isSafeInteger(c.source_in_ms) && c.source_in_ms >= 0,
+        `${d.id}: clip source_in_ms required for delivery`,
+      );
+      const shot = (p?.shots ?? []).find((s) => s.shot_id === c.shot_id);
+      ready(
+        nonempty(c.take_id) && shot?.take_id === c.take_id,
+        `${d.id}: clip must match explicit shot adoption`,
+      );
+    }
   }
+  if (variantIds)
+    check(
+      variantIds.length > 0 && variantIds.every((id) => variants.has(id)),
+      'unknown or empty delivery selection',
+    );
   check(
     ['planning_only', 'generation'].includes(p?.execution_policy?.allowed_scope),
     'execution allowed_scope required',
@@ -154,10 +230,18 @@ export function validateProduction(p) {
       Number.isFinite(p?.execution_policy?.max_credits) && p.execution_policy.max_credits >= 0,
       'invalid max_credits',
     );
-  return { valid: errors.length === 0, errors };
+  const delivery_errors = [...errors, ...deliveryErrors];
+  if (phase === 'delivery') errors.push(...deliveryErrors);
+  return {
+    valid: errors.length === 0,
+    phase,
+    errors,
+    ready_for_delivery: delivery_errors.length === 0,
+    delivery_errors,
+  };
 }
-export function assertProduction(p) {
-  const v = validateProduction(p);
+export function assertProduction(p, options) {
+  const v = validateProduction(p, options);
   requireValue(v.valid, v.errors.join('; '));
   return p;
 }

@@ -402,7 +402,7 @@ test('legacy export verifies adopted source bytes and reports edits the old cons
         { id: 'ja-wide', locale: 'ja', aspect: '16:9', width: 160, height: 90, duration_ms: 1000 },
       ],
     },
-    shots: [{ shot_id: 's1', prompt: 'Open', purpose: 'Intro' }],
+    shots: [{ shot_id: 's1', take_id: 't1', prompt: 'Open', purpose: 'Intro' }],
     timeline: {
       fps: 10,
       clips: [{ shot_id: 's1', take_id: 't1', source_in_ms: 0, duration_ms: 1000, audio: false }],
@@ -484,6 +484,7 @@ test('legacy project and storyboard exports expose required staging and referenc
     shots: [
       {
         shot_id: 's1',
+        take_id: 't1',
         prompt: 'Open',
         purpose: 'Intro',
         camera: 'wide',

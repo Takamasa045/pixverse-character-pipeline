@@ -10,7 +10,7 @@ node production-core/src/cli.mjs finish production.json --takes takes.json --out
 node production-core/src/cli.mjs finish production.json --takes takes.json --out ./deliveries --variant ja-wide
 ```
 
-The CLI requires a validated production document. Paths in the document and take list resolve relative to that production file. The library API also supports `baseDir`, explicit `ffmpeg`/`ffprobe` executables, `phase: 'rough' | 'final'`, `variantIds`, and a ledger `cost_report`. Dry-run reads and probes source files and returns intended paths, without writing files or invoking generation adapters.
+The CLI requires a production document validated with `--phase delivery` (for the selected `--variant`, when supplied). `validate FILE` alone checks planning validity and reports separate structural delivery readiness; a planning-only empty timeline cannot finish. Paths in the document and take list resolve relative to that production file. The library API also supports `baseDir`, explicit `ffmpeg`/`ffprobe` executables, `phase: 'rough' | 'final'`, `variantIds`, and a ledger `cost_report`. Dry-run reads and probes source files and returns intended paths, without writing files or invoking generation adapters.
 
 ## Timeline contract
 
@@ -86,7 +86,7 @@ Crop bounds and declared region containment are technical checks. `framing_revie
 
 ## Acceptance and file gates
 
-Every visual take must belong to the project and shot, have `status: 'accepted'`, `stale: false`, a real nonempty local file and a matching SHA-256. If a shot has a selected `take_id`, the timeline must use that same take. Technical, creative and continuity QA must each be `pass`; audio must be `pass` or `not_applicable`. QA includes a reviewer and notes. Audio assets require the same QA evidence and a matching local hash. Missing files, changed content, unknown QA, stale takes, out-of-range edits and unsupported processing block output. A remote provider ID alone is not a re-editable local delivery.
+Every visual take must belong to the project and shot, have `status: 'accepted'`, `stale: false`, a real nonempty local file and a matching SHA-256. Every shot used in the edit must have an explicit adopted `take_id`, and the timeline must use exactly that take. An accepted take in the take list alone is insufficient. Technical, creative and continuity QA must each be `pass`; audio must be `pass` or `not_applicable`. QA includes a reviewer and notes. Audio assets require the same QA evidence and a matching local hash. Missing files, changed content, unknown QA, stale takes, out-of-range edits and unsupported processing block output. A remote provider ID alone is not a re-editable local delivery.
 
 `inspectDelivery(production, takes, options)` returns `{ok, issues, sources}`. `renderDeliveries(...)` throws `DeliveryGateError` with `code: 'DELIVERY_BLOCKED'` and structured issues when gates fail. Sources are rehashed after rendering so a file changed during a render cannot be certified by an old snapshot.
 

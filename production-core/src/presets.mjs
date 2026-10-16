@@ -1,3 +1,4 @@
+import { submissionBoundary } from './submission.mjs';
 import { createHash } from 'node:crypto';
 import { cliRunner, withContext, mediaId, normalizeCreateResult } from './pixverse.mjs';
 
@@ -518,9 +519,8 @@ export function createPresetAdapter({ run = cliRunner(), infoProvider } = {}) {
     if (r.exit_code !== 0 || version !== snapshot.cli_version)
       fail('Installed CLI differs from approved preset snapshot');
   };
-  return {
-    validate: resolvePresetIntent,
-    async submit(intent) {
+  const boundary = submissionBoundary(
+    async (intent) => {
       const resolved = resolvePresetIntent(intent);
       await checkVersion(resolved.snapshot);
       const latest = await readInfo(intent);
@@ -550,16 +550,26 @@ export function createPresetAdapter({ run = cliRunner(), infoProvider } = {}) {
         if (!orderedTemplate(resolved.snapshot.info)) args.push('--idempotency-key', intent.id);
         args.push('--no-wait', '--json');
       }
-      const r = await run(withContext(args, intent.context), { context: intent.context });
+      return {
+        args: withContext(args, intent.context),
+        ordered: orderedTemplate(resolved.snapshot.info),
+      };
+    },
+    async (intent, { args, ordered }) => {
+      const r = await run(args, { context: intent.context });
       return {
         ...(intent.mode === 'miniapps'
           ? resultMiniApp(r.raw, intent.output_kind, undefined, r.exit_code)
-          : orderedTemplate(resolved.snapshot.info)
+          : ordered
             ? normalizeOrderedResult(r.raw, r.exit_code)
             : normalizeCreateResult(r.raw, intent.output_kind, r.exit_code)),
         stderr: r.stderr,
       };
     },
+  );
+  return {
+    ...boundary,
+    validate: resolvePresetIntent,
     async status(intent, provider_id, result = {}) {
       resolvePresetIntent(intent);
       const id = mediaId(provider_id),

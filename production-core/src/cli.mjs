@@ -53,7 +53,7 @@ function flag(key) {
   if (v === true || v === 'true') return true;
   throw new Error(`--${key} must be true or false`);
 }
-function production(file) {
+function production(file, validationOptions) {
   if (!file) throw new Error('production JSON file required');
   if (/\.ya?ml$/i.test(file))
     throw new Error(
@@ -62,7 +62,7 @@ function production(file) {
   const p = json(file),
     root = dirname(resolve(file));
   for (const a of p.assets ?? []) if (a.path) a.path = resolve(root, a.path);
-  return assertProduction(p);
+  return assertProduction(p, validationOptions);
 }
 const resolveIntent = (i) =>
   i.backend === 'create'
@@ -102,7 +102,7 @@ async function main() {
       runtime: 'production.v1',
       node: '>=22.18',
       commands: [
-        'validate FILE',
+        'validate FILE [--phase planning|delivery] [--variant ID]',
         'plan FILE',
         'run FILE --dry-run',
         'approve FILE --db DB --actor HUMAN',
@@ -147,7 +147,10 @@ async function main() {
     return print(r.raw);
   }
   if (command === 'validate') {
-    const v = validateProduction(json(target));
+    const v = validateProduction(json(target), {
+      phase: options.phase ?? 'planning',
+      variantIds: typeof options.variant === 'string' ? [options.variant] : undefined,
+    });
     if (!v.valid) process.exitCode = 1;
     return print(v);
   }
@@ -168,12 +171,19 @@ async function main() {
     );
   if (command === 'finish')
     return print(
-      await renderDeliveries(production(target), json(required('takes')), {
-        outputDir: resolve(required('out')),
-        baseDir: dirname(resolve(target)),
-        dryRun: flag('dry-run'),
-        variantIds: typeof options.variant === 'string' ? [options.variant] : undefined,
-      }),
+      await renderDeliveries(
+        production(target, {
+          phase: 'delivery',
+          variantIds: typeof options.variant === 'string' ? [options.variant] : undefined,
+        }),
+        json(required('takes')),
+        {
+          outputDir: resolve(required('out')),
+          baseDir: dirname(resolve(target)),
+          dryRun: flag('dry-run'),
+          variantIds: typeof options.variant === 'string' ? [options.variant] : undefined,
+        },
+      ),
     );
   if (command === 'export') {
     const { exportLegacy } = await import('./compat.mjs');
@@ -259,9 +269,9 @@ async function main() {
         ...execution.execution_runtime,
         cli_version: version.exit_code === 0 ? (version.stdout?.trim() ?? null) : null,
       });
-      // Every run checks the installed Create registry again; changed defaults invalidate the approval.
+      // New intents recheck the registry. Persisted jobs must resume without new preflight.
       for (const i of execution.intents)
-        if (i.backend === 'create') {
+        if (i.backend === 'create' && !s.job(i.id)) {
           const r = await cliRunner()(
             withContext(
               ['capabilities', 'create', i.mode, '--model', i.model, '--json'],

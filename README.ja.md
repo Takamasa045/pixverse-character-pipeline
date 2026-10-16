@@ -32,6 +32,8 @@ node --test production-core/test/*.test.mjs
 
 生成前にテンポを確認するには、`rough-plan production.json --font /path/to/existing-font.ttf --out previews` で無音の文章カードを並べます。既存FFmpeg/Pillowを使う計画用MP4で、完成品の採用とは別です。
 
+`validate` は既定で計画検証です。未編集なら `ready_for_delivery: false` を返します。実編集は `validate production.json --phase delivery [--variant ID]` で確認し、`finish` でも同じ検証と素材・採用・QAゲートを通します。空の納品別clips指定は拒否します。
+
 同梱fixtureは計画専用です。生成前に採用参照、実際のcontext、capability snapshot、価格根拠が必要です。Canvasの採用素材は、選択historyを取得前後に確認し、容量制限付きHTTPSで保存できます。
 
 人物登録、承認後の実行、再開、仕上げ、移行、代表3例は[利用ガイド](references/production-v1.md)、正確な項目は[データ契約](production-core/docs/CONTRACT.md)を参照します。同じ作品を両入口で扱う時は明示的に同じ `--db` パスを指定します。

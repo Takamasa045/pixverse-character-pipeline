@@ -405,6 +405,12 @@ export class Executor {
     requireValue(plan.generation_permitted, 'generation blocked; inspect plan');
     const report = [];
     for (const intent of plan.intents) {
+      // Known durable jobs must never require a fresh provider preflight or re-submission.
+      const existing = this.store.job(intent.id);
+      if (existing) {
+        report.push({ id: intent.id, state: existing.state, reused: true });
+        continue;
+      }
       const adapter = this.adapters[intent.backend];
       requireValue(adapter, 'backend adapter unavailable');
       for (const ref of intent.entity_revisions ?? []) {
@@ -417,14 +423,23 @@ export class Executor {
         );
       }
       // Validation happens before a reservation. A pre-submit validation failure is not an unknown submission.
-      if (adapter.validate) adapter.validate(intent);
+      let prepared;
+      try {
+        if (adapter.validate) await adapter.validate(intent);
+        // Built-in prepare methods contain only read-only queries/dry-run. No job, reservation
+        // or paid attempt exists until they succeed. A later throw is conservatively unknown.
+        if (adapter.prepare) prepared = await adapter.prepare(intent);
+      } catch (error) {
+        this.store.event('preflight_failed', intent.id, { error: String(error), submitted: false });
+        throw error;
+      }
       const { claimed, job } = this.store.claim(intent, plan, approval);
       if (!claimed) {
         report.push({ id: intent.id, state: job.state, reused: true });
         continue;
       }
       try {
-        const response = await adapter.submit(intent);
+        const response = await adapter.submit(intent, prepared);
         report.push(this.store.record(intent, response));
       } catch (error) {
         this.store.setState(intent.id, 'unknown_submission', { error: String(error) });

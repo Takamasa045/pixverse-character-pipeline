@@ -6,11 +6,34 @@ HTTP generation endpoints. Import them from `src/pixverse.mjs` and
 submission states, known provider IDs, and whether an operation may run. Never
 call an adapter from a production dry-run.
 
+Built-in adapters expose `prepare(intent)` in addition to `submit(intent, token)`.
+The executor first reuses any durable job, then runs offline validation and read-only
+preparation **before** claiming a paid attempt or reserving credits. Create preparation
+queries the live registry and builds exact argv; preset preparation checks CLI version
+and current info; Canvas preparation queries capabilities and performs Graph dry-run.
+A failed preparation records `preflight_failed` in the audit history with no job,
+reservation or paid attempt. Once the cause is fixed, the same exact approved intent
+can run again without a provider reconciliation for a request that was never sent.
+
+Preparation returns an opaque, one-use token scoped to that adapter instance and
+exact intent content. The executor passes it to `submit` only after the transactional
+claim. Tokens contain no public argv and cannot be serialized for later use. Concurrent
+read-only preparations still compete for one durable claim. Existing jobs bypass all
+preparation, including after restarting the process. A direct `submit(intent)` call
+retains compatibility by preparing first; production callers must use the executor.
+
+Only submission crosses a mutation boundary: Create/MiniApp/template create, or
+Canvas patch **apply** (before dispatch). Any exception after that boundary remains
+`unknown_submission`; an unconfirmed Canvas apply retains unresolved exposure even
+if dispatch never began. Partial IDs are retained, and generic/custom adapter exceptions
+are never inferred to be safely unsent. A custom adapter's `prepare` must be strictly
+read-only. Do not put uploads, patch apply, generation, purchases or retries there.
+
 ## Create
 
 ```js
-import {createPixVerseAdapter,validateCreateIntent} from './src/pixverse.mjs';
-const resolved = validateCreateIntent(provisionalIntent,capturedCapability);
+import { createPixVerseAdapter, validateCreateIntent } from './src/pixverse.mjs';
+const resolved = validateCreateIntent(provisionalIntent, capturedCapability);
 // Hash resolved.parameters into the final immutable approved intent first.
 const adapter = createPixVerseAdapter();
 adapter.validate(intent); // Offline; requires intent.capability_snapshot.
@@ -52,8 +75,8 @@ existing ID exclusively; a failed transfer never calls create.
 
 ```js
 const adapter = createPixVerseAdapter({
-  run:async (argv,{context}) => ({raw:parsedStdout,exit_code:0,stderr:''}),
-  capabilities:snapshotOrModeModelMapOrAsyncIntentFunction,
+  run: async (argv, { context }) => ({ raw: parsedStdout, exit_code: 0, stderr: '' }),
+  capabilities: snapshotOrModeModelMapOrAsyncIntentFunction,
 });
 ```
 
@@ -121,9 +144,9 @@ The explicit boundaries are:
    ready or metadata nodes.
 
 `createCanvasAdapter({run,capabilities?,downloadMedia?})` exposes offline
-`validate`, `submit`, `status`, `download`, `graph`, `versions`, `selectVersion`.
-`submit` queries Canvas capabilities unless a fixture provider is injected, then
-uses those three boundaries. An unconfirmed apply/dispatch retains the known
+`validate`, `prepare`, `submit`, `status`, `download`, `graph`, `versions`, `selectVersion`.
+`prepare` queries Canvas capabilities unless a fixture provider is injected, then
+performs dry-run. After the durable claim, `submit` uses apply and dispatch. An unconfirmed apply/dispatch retains the known
 node ID for inspection; there is no fallback to Create and no automatic retry.
 `READY`, `BLOCKED`, and `METADATA` are not completion. An unchanged or missing
 selected history cannot complete a new intent. A completed candidate still needs
@@ -139,10 +162,18 @@ ID as a Create media ID. `downloadCanvasSelection` also serves human selections
 imported from Canvas without a generation intent:
 
 ```js
-import {downloadCanvasSelection} from './src/canvas.mjs';
-const result = await downloadCanvasSelection({
-  project_id,node_id,history_id,context,destination:outputDirectory,kind:'video',
-}, {run,downloadOptions:{fetchImpl:fixtureFetch}});
+import { downloadCanvasSelection } from './src/canvas.mjs';
+const result = await downloadCanvasSelection(
+  {
+    project_id,
+    node_id,
+    history_id,
+    context,
+    destination: outputDirectory,
+    kind: 'video',
+  },
+  { run, downloadOptions: { fetchImpl: fixtureFetch } },
+);
 ```
 
 The helper reads the selected history before and after transferring its media.

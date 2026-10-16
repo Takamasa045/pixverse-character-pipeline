@@ -1,3 +1,4 @@
+import { submissionBoundary } from './submission.mjs';
 import { execFile } from 'node:child_process';
 import { accessSync, constants, realpathSync } from 'node:fs';
 import { delimiter, resolve } from 'node:path';
@@ -392,7 +393,27 @@ export function createPixVerseAdapter({ run = cliRunner(), capabilities } = {}) 
       fail('Unable to query installed Create capabilities');
     return result.raw;
   };
+  const boundary = submissionBoundary(
+    async (intent) => {
+      const snapshot = await query(intent);
+      if (intent.capability_snapshot) {
+        const approved = validateCreateIntent(intent, intent.capability_snapshot).parameters;
+        const current = validateCreateIntent(intent, snapshot).parameters;
+        if (JSON.stringify(approved) !== JSON.stringify(current))
+          fail('Create capability resolution changed after approval; rebuild intent');
+      }
+      return buildCreateCommand(intent, snapshot);
+    },
+    async (intent, args) => {
+      const response = await run(args, { context: intent.context });
+      return {
+        ...normalizeCreateResult(response.raw, kindFor(intent.mode), response.exit_code),
+        stderr: response.stderr,
+      };
+    },
+  );
   return {
+    ...boundary,
     validate(intent) {
       const snapshot =
         intent.capability_snapshot ??
@@ -405,20 +426,6 @@ export function createPixVerseAdapter({ run = cliRunner(), capabilities } = {}) 
     },
     async capabilities(intent) {
       return query(intent);
-    },
-    async submit(intent) {
-      const snapshot = await query(intent);
-      if (intent.capability_snapshot) {
-        const approved = validateCreateIntent(intent, intent.capability_snapshot).parameters;
-        const current = validateCreateIntent(intent, snapshot).parameters;
-        if (JSON.stringify(approved) !== JSON.stringify(current))
-          fail('Create capability resolution changed after approval; rebuild intent');
-      }
-      const response = await run(buildCreateCommand(intent, snapshot), { context: intent.context });
-      return {
-        ...normalizeCreateResult(response.raw, kindFor(intent.mode), response.exit_code),
-        stderr: response.stderr,
-      };
     },
     async status(intent, provider_id) {
       if (intent.backend !== 'create') fail('Create status cannot query Canvas');

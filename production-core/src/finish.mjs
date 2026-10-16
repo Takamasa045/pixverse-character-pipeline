@@ -1,3 +1,4 @@
+import { selectedTimeline } from './contracts.mjs';
 import { requireMatchingContext } from './review.mjs';
 // Local-only finishing. This module never submits jobs or changes adopted takes.
 import { createHash } from 'node:crypto';
@@ -24,20 +25,6 @@ const qaPass = (qa) =>
   typeof qa.reviewer === 'string' &&
   qa.reviewer.trim() &&
   typeof qa.notes === 'string';
-const relevant = (item, delivery) =>
-  (!item.delivery_id || item.delivery_id === delivery.id) &&
-  (!item.variant_id || item.variant_id === delivery.id) &&
-  (!item.locale || item.locale === delivery.locale);
-const selectedTimeline = (production, delivery) =>
-  Object.fromEntries(
-    ['clips', 'audio', 'captions'].map((key) => [
-      key,
-      (key === 'captions' && delivery.caption_mode === 'off'
-        ? []
-        : (delivery.timeline?.[key] ?? production.timeline?.[key] ?? [])
-      ).filter((item) => relevant(item, delivery)),
-    ]),
-  );
 
 export class DeliveryGateError extends Error {
   constructor(issues) {
@@ -422,7 +409,7 @@ export async function inspectDelivery(production, takes, options = {}) {
         add('TAKE_MISMATCH', { shot_id: clip.shot_id, take_id: clip.take_id });
         continue;
       }
-      if (shot?.take_id && shot.take_id !== take.id)
+      if (shot?.take_id !== take.id)
         add('ADOPTED_TAKE_MISMATCH', { shot_id: clip.shot_id, take_id: clip.take_id });
       const pinned = shot?.entity_revisions ?? [];
       const recorded = take.provenance?.entity_revisions ?? [];
