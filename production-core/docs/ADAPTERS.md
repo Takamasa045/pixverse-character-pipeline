@@ -220,9 +220,9 @@ Canvas dispatch-result/task-history attribution have not been tested. Concurrent
 human version switches can change the current history independently of the
 submitted intent; current-history detection alone cannot prove which generation
 request produced it. Such candidates require sync/provenance review before use.
-Modern template runtime input sequences and strict speech/lip synchronization
-still require exact discovered contracts. They are not implemented by assuming
-image-to-video behavior.
+Ordered template input/output contracts are verified separately below. Strict speech/lip
+synchronization still requires a route-specific verified contract; image-to-video
+behavior does not establish exact dialogue synchronization.
 
 ## Conditional preset candidates and execution
 
@@ -282,28 +282,82 @@ as the primary output. Missing inspection remains pending; a mismatched output
 kind is surfaced. MiniApp output kind requires snapshot-bound analysis evidence,
 since the normalized input schema does not establish an output kind.
 
-The legacy template execution path supports the verified CLI 1.4.8 public
-`effect_type`/`template_type` schema. It validates the exact image count or allowed
-video alternative, preserves input order, derives image versus video output and
-uses a stable idempotency key from the first request. It rejects arbitrary output
-overrides instead of assuming template constraints can be changed. Template
-media must be backed by matching context-bound input snapshots.
+The legacy template path supports the verified CLI 1.4.8 and 1.4.9
+`effect_type`/`template_type` schema. It validates image counts or the supported
+video alternative, preserves order, derives image/video output and uses the
+intent's stable idempotency key. Arbitrary output overrides are rejected.
 
-The current [CLI README](https://github.com/PixVerseAI/cli#templates) and
-[1.4.9 changelog](https://github.com/PixVerseAI/cli/blob/86d5ec07f33c7ab8e503019b8f6161f698e042a0/CHANGELOG.md)
-describe ordered inputs and fixed template outputs. The installed CLI remains
-1.4.8. The public prose does not supply a captured account-specific ordered-slot
-field schema or exact `outputs` item shape. 1.4.9 template execution therefore
-returns an explicit schema-verification blocker; it is still considered by pure
-candidate planning. Required evidence is a successful read-only `template info`
-response with slot names/types/required order/fixed settings, matching installed
-help/capabilities, output result fixtures and exact CLI pricing evidence. No CLI
-update, guessed private payload, authentication change or paid request is used
-to bypass this condition.
+The ordered path is verified against the official
+[CLI 1.4.9 source](https://github.com/PixVerseAI/cli/blob/86d5ec07f33c7ab8e503019b8f6161f698e042a0/dist/index.js),
+[README](https://github.com/PixVerseAI/cli/tree/86d5ec07f33c7ab8e503019b8f6161f698e042a0#templates)
+and [changelog](https://github.com/PixVerseAI/cli/blob/86d5ec07f33c7ab8e503019b8f6161f698e042a0/CHANGELOG.md).
+The retrieved `dist/index.js` is 1,149,399 bytes with SHA-256
+`ad2cef6c3b26157aa00125f8393346faa4fab97b631479093c3c0c99b31a5d54`;
+the isolated executable is byte-identical. The pinned commit, digest and
+sanitized read contract are retained in the neutral fixture.
 
-Catalog list reads attempted in this task failed with a network error. No current
-account availability is claimed. The preset tests use documented schema examples
-with explicit fixture annotations, including unknown response, wrong output,
-schema drift and version drift. These tests demonstrate code behavior, not live
-app access. See the [official MiniApps contract](https://github.com/PixVerseAI/skills/blob/main/skills/capabilities/miniapps.md)
+`template_source:21|22` selects this path; legacy `effect_type` never determines
+its input count. `input_fields` is the ordered schema. Each field has
+`content_type:'image'|'video'|'text'`, optional `name`/`node_id`, `required`
+(defaults to required unless exactly false), and positive optional `max_size`
+(bytes), `min_duration`/`max_duration` (seconds). The CLI supports at most one
+video field and one text field. Reference snapshots must match the context,
+kind, declared byte limit and video duration limits before submission.
+
+Image inputs reserve enough values for required fields, then fill optional
+fields from left to right. An explicit empty image argument is retained only
+when it describes the same representable mapping. For example optional→required
+accepts `image:['', 'required.png']`; skipping an earlier optional field to fill a
+later optional field is rejected. References can identify a field with the
+internal `parameter` equal to its exact `node_id` or unique `name`, or follow the
+existing `binding.order`. `video` and `prompt` require corresponding fields.
+Omitted text uses the template default as the official CLI does. Text beyond
+5000 Unicode characters is rejected instead of silently truncated.
+
+Fixed settings reject `quality`, `duration`, `aspect_ratio`, `seed`, `count`,
+`off_peak`, **and `idempotency_key`**. The adapter does not inject any of them.
+`info.fixed_cost` is required as a current credit quote; an approved
+`upper_credits` below it blocks planning/submission. The entire exact info
+snapshot, including input constraints, declared `output` metadata and cost, is
+bound into the plan and compared again immediately before the create command.
+`output` describes the preset's declared media kinds, dimensions and duration;
+these are compared to requirements and are never rewritten by local analysis.
+They are metadata, not evidence of actual generated quality. The cost quote is
+never copied into per-output `cost_credits`; actual billing remains unknown until
+provider evidence is available.
+
+The submission result is `outputs:[{media_id,media_type:'image'|'video'}]`.
+All valid IDs and their individual kinds are recorded, including mixed image/video
+outputs. Error envelopes can carry `valid_outputs` and `response.outputs`; valid
+siblings survive a malformed result and the error preserves uncertainty. A valid
+ID with an unverified media type is retained for explicit reconciliation.
+Resume and download use each saved output's kind. Failed local storage, timeout,
+or malformed output never triggers another create request. Since fixed templates
+reject a provider idempotency key, the shared durable claim and unresolved-job
+block are essential; an unknown submission requires provider-history reconciliation.
+
+The installed global CLI is 1.4.8. Its read-only `template info` already exposes
+ordered metadata, but its generation implementation does not support the new
+path; the adapter rejects an ordered submission through 1.4.8. CLI 1.4.9 was
+also executed from an isolated directory using existing dependencies, without
+changing the global installation. Its `--version` and read-only `template info`
+were verified. Select an installed, verified 1.4.9 executable with `PIXVERSE_BIN`
+and capture its exact version in the preset snapshot. A change to the executable
+or schema requires a new plan. Future CLI versions require contract verification.
+
+Read-only catalog and detail queries succeeded on 2026-10-16. One current ordered
+template exposed two required image fields, a declared 720×1280, 10-second video,
+and a quote of 220 credits. This proves discovery access at that time, not
+paid generation or creative quality. Tracked fixtures replace all account,
+author, template/media IDs and asset values with neutral synthetic data; see
+`fixtures/ordered-template-contract.json`. Its `live_read_contract` retains the
+observed two-required-image shape, exact field types/constraints and output
+metadata. Its separate `info`/response objects are synthetic exercises of the
+source-verified optional/image/video/text and output contracts, rather than
+claimed provider result captures. The tests cover optional/required
+mapping, slot limits, quote/schema/version drift, fixed-control rejection, mixed
+IDs, process restart and storage-failure recovery with exactly one create call.
+No live generation, authentication change or paid call was made.
+
+See also the [official MiniApps contract](https://github.com/PixVerseAI/skills/blob/main/skills/capabilities/miniapps.md)
 and [legacy template contract](https://github.com/PixVerseAI/skills/blob/6f2c5641031f3d3bd2e54db5280dec735ce94eb3/skills/capabilities/template.md).

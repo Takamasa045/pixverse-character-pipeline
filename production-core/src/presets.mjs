@@ -128,15 +128,255 @@ export function validateMiniAppParameters(info, parameters, { inputs = [], conte
   }
   return result;
 }
+// PixVerse CLI 1.4.9, source pinned in docs/ADAPTERS.md. Sources 21/22
+// dispatch to template/generate; the legacy model Create route cannot replace it.
+const orderedTemplate = (info) => [21, 22].includes(info.template_source);
+const templateVersionSupported = (info, version) =>
+  orderedTemplate(info) ? version === '1.4.9' : ['1.4.8', '1.4.9'].includes(version);
+function orderedSlots(info) {
+  const fields = info.input_fields;
+  if (
+    !Array.isArray(fields) ||
+    !fields.length ||
+    fields.some((f) => !f || !['image', 'video', 'text'].includes(f.content_type))
+  )
+    fail('Template detail has no supported input_fields schema');
+  for (const f of fields) {
+    for (const name of ['max_size', 'min_duration', 'max_duration'])
+      if (f[name] !== undefined && (!Number.isFinite(f[name]) || f[name] <= 0))
+        fail(`Invalid template ${name} constraint`);
+    if (
+      f.min_duration !== undefined &&
+      f.max_duration !== undefined &&
+      f.min_duration > f.max_duration
+    )
+      fail('Template duration constraints have no intersection');
+  }
+  if (
+    fields.filter((f) => f.content_type === 'video').length > 1 ||
+    fields.filter((f) => f.content_type === 'text').length > 1
+  )
+    fail('Template has more video/text slots than the CLI supports');
+  return fields;
+}
+// Exact CLI mapping: reserve the remaining inputs for required slots; fill optional
+// slots from left to right. Empty placeholders must describe that same mapping.
+function mapOrderedImages(slots, values) {
+  let at = 0,
+    remainingRequired = slots.filter((f) => f.required !== false).length;
+  return slots.map((f) => {
+    const value =
+      f.required === false && values.length - at <= remainingRequired ? '' : (values[at++] ?? '');
+    if (f.required !== false) remainingRequired--;
+    return value;
+  });
+}
+function modernTemplateParameters(intent, snapshot) {
+  const info = snapshot.info,
+    fields = orderedSlots(info),
+    p = copy(intent.parameters ?? {});
+  if (!templateVersionSupported(info, snapshot.cli_version))
+    fail(
+      'Ordered templates require the verified CLI 1.4.9 execution contract; installed 1.4.8 cannot submit this schema',
+    );
+  if (mediaId(intent.preset_id) !== mediaId(info.template_id))
+    fail('Template ID differs from snapshot');
+  for (const name of Object.keys(p))
+    if (!['image', 'video', 'prompt'].includes(name))
+      fail(`Fixed template output/control override is not accepted: ${name}`);
+  if (!Number.isFinite(info.fixed_cost) || info.fixed_cost < 0)
+    fail('Live fixed template credit cost required before approval');
+  if (!Number.isFinite(intent.upper_credits) || intent.upper_credits < info.fixed_cost)
+    fail('Approved upper_credits is below the fixed template cost or missing');
+  const images = fields.filter((f) => f.content_type === 'image');
+  const videos = fields.filter((f) => f.content_type === 'video');
+  const text = fields.filter((f) => f.content_type === 'text');
+  const inputs = [...(intent.inputs ?? [])].sort(
+    (a, b) => (a.binding?.order ?? 0) - (b.binding?.order ?? 0),
+  );
+  const values = new Map(),
+    imageInputs = [],
+    videoInputs = [];
+  for (const input of inputs) {
+    if (!['image', 'video'].includes(input.kind) || !contextMatches(input, intent.context))
+      fail('Template input kind or context is unsupported');
+    const value = input.provider_id ?? input.path ?? input.media_path;
+    if (typeof value !== 'string' || !value || value.startsWith('http:'))
+      fail('Invalid template media input');
+    values.set(value, input);
+    (input.kind === 'image' ? imageInputs : videoInputs).push(input);
+  }
+  const valueFor = (i) => i.provider_id ?? i.path ?? i.media_path;
+  if (imageInputs.length && !present(p.image)) {
+    if (imageInputs.some((i) => i.parameter !== undefined)) {
+      p.image = images.map(() => '');
+      for (const i of imageInputs) {
+        const matches = images
+          .map((f, n) => (i.parameter === f.node_id || i.parameter === f.name ? n : -1))
+          .filter((n) => n >= 0);
+        if (matches.length !== 1 || p.image[matches[0]])
+          fail('Template image slot binding must identify one unoccupied field');
+        p.image[matches[0]] = valueFor(i);
+      }
+    } else p.image = imageInputs.map(valueFor);
+  }
+  if (videoInputs.length > 1) fail('Template takes at most one video');
+  if (videoInputs.length) {
+    if (present(p.video) && p.video !== valueFor(videoInputs[0]))
+      fail('Conflicting template video binding');
+    p.video = valueFor(videoInputs[0]);
+  }
+  const supplied = p.image ?? [];
+  if (
+    !Array.isArray(supplied) ||
+    supplied.some((v) => typeof v !== 'string') ||
+    supplied.length > images.length
+  )
+    fail('Image inputs exceed or do not match the ordered template slots');
+  const mapped = supplied.includes('')
+    ? images.map((f, n) => supplied[n] ?? '')
+    : mapOrderedImages(images, supplied);
+  if (images.some((f, n) => f.required !== false && !mapped[n]))
+    fail('Missing required ordered image slot');
+  const canonical = mapOrderedImages(images, mapped.filter(Boolean));
+  if (mapped.some((v, n) => v !== canonical[n]))
+    fail('Optional image selection cannot be represented; fill optional slots from left to right');
+  if ((p.video && !videos.length) || (videos.length && videos[0].required !== false && !p.video))
+    fail('Video input does not match the template slots');
+  if (p.prompt !== undefined && (!text.length || typeof p.prompt !== 'string'))
+    fail('Template has no matching editable text input slot');
+  if (p.prompt !== undefined && Array.from(p.prompt).length > 5000)
+    fail('Template text exceeds the CLI 5000 character limit; refusing silent truncation');
+  const bound = [
+    ...mapped.map((v, n) => [v, images[n]]),
+    ...(p.video ? [[p.video, videos[0]]] : []),
+  ];
+  for (const [value, field] of bound) {
+    if (!value) continue;
+    const input = inputs.find(
+      (i) =>
+        valueFor(i) === value &&
+        i.kind === field.content_type &&
+        (i.parameter === undefined || i.parameter === field.node_id || i.parameter === field.name),
+    );
+    if (!input || input.kind !== field.content_type)
+      fail('Template media input lacks a matching context-bound snapshot');
+    if (
+      input.parameter !== undefined &&
+      input.parameter !== field.node_id &&
+      input.parameter !== field.name
+    )
+      fail('Template media snapshot does not match the selected ordered slot');
+    if (
+      field.max_size !== undefined &&
+      (!Number.isSafeInteger(input.size_bytes) ||
+        input.size_bytes < 0 ||
+        input.size_bytes > field.max_size)
+    )
+      fail('Template input size is unknown or exceeds the field limit');
+    if (
+      field.content_type === 'video' &&
+      (field.min_duration !== undefined || field.max_duration !== undefined)
+    ) {
+      const seconds = input.duration_ms / 1000;
+      if (
+        !Number.isFinite(seconds) ||
+        seconds <= 0 ||
+        (field.min_duration !== undefined && seconds < field.min_duration) ||
+        (field.max_duration !== undefined && seconds > field.max_duration)
+      )
+        fail('Template video duration is unknown or outside field limits');
+    }
+  }
+  if (inputs.some((i) => !bound.some(([v]) => v === valueFor(i))))
+    fail('Unbound template reference snapshot');
+  if (mapped.length) p.image = mapped;
+  return p;
+}
+function modernOutput(info) {
+  const items = info.output;
+  if (
+    !Array.isArray(items) ||
+    !items.length ||
+    items.some((o) => !['image', 'video'].includes(o.type))
+  )
+    fail('Template declared output metadata is unavailable');
+  const kinds = [...new Set(items.map((o) => o.type))];
+  const durations = items.map((o) => o.duration);
+  const ratio = (a, b) => {
+    while (b) [a, b] = [b, a % b];
+    return a;
+  };
+  const aspects = items
+    .filter(
+      (o) =>
+        Number.isSafeInteger(o.width) &&
+        o.width > 0 &&
+        Number.isSafeInteger(o.height) &&
+        o.height > 0,
+    )
+    .map((o) => {
+      const d = ratio(o.width, o.height);
+      return `${o.width / d}:${o.height / d}`;
+    });
+  return {
+    kind: kinds.length === 1 ? kinds[0] : null,
+    kinds,
+    declared_outputs: copy(items),
+    fixed_duration_ms: null,
+    aspects: null,
+    ...(durations.every((d) => Number.isFinite(d) && d > 0) && new Set(durations).size === 1
+      ? { fixed_duration_ms: durations[0] * 1000 }
+      : {}),
+    ...(aspects.length === items.length ? { aspects: [...new Set(aspects)] } : {}),
+  };
+}
+function normalizeOrderedResult(raw, exit_code = 0) {
+  const data = raw?.Resp ?? raw ?? {},
+    results = new Map(),
+    issues = [];
+  // Error responses deliberately retain valid_outputs and response.outputs. Do
+  // not lose accepted IDs merely because another output is malformed.
+  for (const item of [
+    ...(Array.isArray(data.outputs) ? data.outputs : []),
+    ...(Array.isArray(data.valid_outputs) ? data.valid_outputs : []),
+    ...(Array.isArray(data.response?.outputs) ? data.response.outputs : []),
+  ]) {
+    let id;
+    try {
+      id = mediaId(item?.media_id);
+    } catch (e) {
+      issues.push(e.message);
+      continue;
+    }
+    if (!['image', 'video'].includes(item.media_type)) {
+      issues.push(`Unknown output type for ${id}`);
+      if (!results.has(id))
+        results.set(id, { id, kind: 'unknown', status: 'running', inspection_unconfirmed: true });
+      continue;
+    }
+    const prior = results.get(id);
+    if (prior && prior.kind !== 'unknown' && prior.kind !== item.media_type) {
+      issues.push(`Conflicting media types for output ${id}`);
+      results.set(id, { id, kind: 'unknown', status: 'running', inspection_unconfirmed: true });
+    } else results.set(id, { id, kind: item.media_type, status: 'submitted' });
+  }
+  if (!results.size)
+    issues.push('No verified ordered template output IDs; reconcile provider history before retry');
+  return {
+    results: [...results.values()],
+    exit_code,
+    ...(data.error || issues.length ? { error: data.error ?? issues.join('; ') } : {}),
+    raw,
+  };
+}
+
 function templateParameters(intent, snapshot) {
   const info = snapshot.info,
     parameters = copy(intent.parameters ?? {});
-  // 1.4.9 adds ordered slots and fixed settings with a different backend contract.
-  // No raw slot field names are published in the current skill: do not guess them.
-  if (snapshot.cli_version !== '1.4.8')
-    fail(
-      'Ordered/fixed-output template execution needs an exact versioned input/output schema fixture; only verified legacy CLI 1.4.8 template execution is supported',
-    );
+  if (orderedTemplate(info)) return modernTemplateParameters(intent, snapshot);
+  if (!templateVersionSupported(info, snapshot.cli_version))
+    fail('Unverified template CLI version; verified versions are 1.4.8 and 1.4.9');
   if (!Number.isSafeInteger(info.effect_type) || info.effect_type < 0 || !outputKind(info))
     fail('Unknown template input/output schema');
   if (mediaId(intent.preset_id) !== mediaId(info.template_id))
@@ -199,7 +439,9 @@ export function resolvePresetIntent(intent) {
   let parameters, kind;
   if (intent.mode === 'template') {
     parameters = templateParameters(intent, snapshot);
-    kind = outputKind(snapshot.info);
+    kind = orderedTemplate(snapshot.info) ? intent.output_kind : outputKind(snapshot.info);
+    if (orderedTemplate(snapshot.info) && !modernOutput(snapshot.info).kinds.includes(kind))
+      fail('Approved output kind is absent from template output metadata');
   } else {
     if (stringId(snapshot.info.app_id) !== intent.preset_id)
       fail('MiniApp ID differs from snapshot');
@@ -305,20 +547,24 @@ export function createPresetAdapter({ run = cliRunner(), infoProvider } = {}) {
             ...(Array.isArray(value) ? value : [String(value)]),
           );
         }
-        args.push('--idempotency-key', intent.id, '--no-wait', '--json');
+        if (!orderedTemplate(resolved.snapshot.info)) args.push('--idempotency-key', intent.id);
+        args.push('--no-wait', '--json');
       }
       const r = await run(withContext(args, intent.context), { context: intent.context });
       return {
         ...(intent.mode === 'miniapps'
           ? resultMiniApp(r.raw, intent.output_kind, undefined, r.exit_code)
-          : normalizeCreateResult(r.raw, intent.output_kind, r.exit_code)),
+          : orderedTemplate(resolved.snapshot.info)
+            ? normalizeOrderedResult(r.raw, r.exit_code)
+            : normalizeCreateResult(r.raw, intent.output_kind, r.exit_code)),
         stderr: r.stderr,
       };
     },
-    async status(intent, provider_id) {
+    async status(intent, provider_id, result = {}) {
       resolvePresetIntent(intent);
       const id = mediaId(provider_id),
-        type = intent.mode === 'miniapps' ? 'miniapps' : intent.output_kind;
+        type = intent.mode === 'miniapps' ? 'miniapps' : (result.kind ?? intent.output_kind);
+      if (!['miniapps', 'image', 'video'].includes(type)) fail('Unsupported preset result kind');
       let r = await run(
         withContext(['task', 'status', id, '--type', type, '--json'], intent.context),
         { context: intent.context },
@@ -334,11 +580,11 @@ export function createPresetAdapter({ run = cliRunner(), infoProvider } = {}) {
         }
         return { ...resultMiniApp(r.raw, intent.output_kind, id, r.exit_code), stderr: r.stderr };
       }
-      const result = normalizeCreateResult(r.raw, intent.output_kind, r.exit_code);
-      if (!result.results.length && r.exit_code === 0 && r.raw?.status)
-        result.results.push({
+      const normalized = normalizeCreateResult(r.raw, type, r.exit_code);
+      if (!normalized.results.length && r.exit_code === 0 && r.raw?.status)
+        normalized.results.push({
           id,
-          kind: intent.output_kind,
+          kind: type,
           status:
             r.raw.status === 'completed'
               ? 'completed'
@@ -346,12 +592,13 @@ export function createPresetAdapter({ run = cliRunner(), infoProvider } = {}) {
                 ? 'provider_failed'
                 : 'running',
         });
-      return { ...result, stderr: r.stderr };
+      return { ...normalized, stderr: r.stderr };
     },
-    async download(intent, provider_id, destination) {
+    async download(intent, provider_id, destination, result = {}) {
       resolvePresetIntent(intent);
       const id = mediaId(provider_id),
-        type = intent.mode === 'miniapps' ? 'miniapps' : intent.output_kind;
+        type = intent.mode === 'miniapps' ? 'miniapps' : (result.kind ?? intent.output_kind);
+      if (!['miniapps', 'image', 'video'].includes(type)) fail('Unsupported preset result kind');
       if (!destination || typeof destination !== 'string')
         fail('Preset download directory required');
       const r = await run(
@@ -374,15 +621,15 @@ export function createPresetAdapter({ run = cliRunner(), infoProvider } = {}) {
               error: r.raw?.error ?? r.stderr,
               raw: r.raw,
             };
-      const result = normalizeCreateResult(r.raw, intent.output_kind, r.exit_code);
-      if (!result.results.length && r.exit_code === 0 && r.raw?.file)
-        result.results.push({
+      const normalized = normalizeCreateResult(r.raw, type, r.exit_code);
+      if (!normalized.results.length && r.exit_code === 0 && r.raw?.file)
+        normalized.results.push({
           id,
-          kind: intent.output_kind,
+          kind: type,
           status: 'completed',
           path: r.raw.file,
         });
-      return result;
+      return normalized;
     },
   };
 }
@@ -412,17 +659,42 @@ export function planPresetCandidates({
         missing_inputs: [],
         unknown: [],
         mismatches: [],
-        execution_supported: mode === 'miniapps' || snapshot.cli_version === '1.4.8',
+        execution_supported:
+          mode === 'miniapps' ||
+          templateVersionSupported(info, cli_version ?? snapshot.cli_version),
         live_recheck_required: true,
       };
+      let declaredOutput = {};
+      const ordered = mode === 'template' && orderedTemplate(info);
+      if (ordered)
+        declaredOutput = {
+          kind: null,
+          kinds: [],
+          fixed_duration_ms: null,
+          aspects: null,
+          declared_outputs: [],
+        };
+      if (mode === 'template' && orderedTemplate(info)) {
+        try {
+          declaredOutput = modernOutput(info);
+        } catch {
+          candidate.unknown.push('fixed_output_schema');
+        }
+      }
       const output = {
         ...(mode === 'template'
           ? {
-              kind: outputKind(info),
-              default_duration_ms: typeof info.duration === 'number' ? info.duration * 1000 : null,
+              ...(orderedTemplate(info)
+                ? {}
+                : {
+                    kind: outputKind(info),
+                    default_duration_ms:
+                      typeof info.duration === 'number' ? info.duration * 1000 : null,
+                  }),
             }
           : {}),
         ...(analysis?.output ?? {}),
+        ...declaredOutput,
       };
       const compare = (requirement, requested, actual) => {
         if (requested === undefined || requested === false) return;
@@ -440,7 +712,11 @@ export function planPresetCandidates({
         if (state === 'unknown') candidate.unknown.push(requirement);
         if (state === 'mismatch') candidate.mismatches.push(requirement);
       };
-      compare('output_kind', requirements.output_kind, output.kind);
+      compare(
+        'output_kind',
+        requirements.output_kind,
+        output.kinds?.includes(requirements.output_kind) ? requirements.output_kind : output.kind,
+      );
       compare('duration_ms', requirements.duration_ms, output.fixed_duration_ms);
       compare('aspects', requirements.aspects, output.aspects);
       compare('editable_shots', requirements.requires_editable_shots, output.editable_shots);
@@ -474,7 +750,24 @@ export function planPresetCandidates({
               candidate.missing_inputs.push(field.name);
           }
       } else {
-        if (!Number.isSafeInteger(info.effect_type)) candidate.unknown.push('ordered_input_schema');
+        if (orderedTemplate(info)) {
+          try {
+            const fields = orderedSlots(info);
+            for (const kind of ['image', 'video']) {
+              const required = fields.filter(
+                (f) => f.content_type === kind && f.required !== false,
+              ).length;
+              if ((item.inputs ?? []).filter((i) => i.kind === kind).length < required)
+                candidate.missing_inputs.push(`${required} ${kind} input(s)`);
+            }
+            candidate.fixed_cost_credits = info.fixed_cost ?? null;
+            if (!Number.isFinite(info.fixed_cost) || info.fixed_cost < 0)
+              candidate.unknown.push('fixed_cost');
+          } catch (e) {
+            candidate.unknown.push('ordered_input_schema');
+          }
+        } else if (!Number.isSafeInteger(info.effect_type))
+          candidate.unknown.push('ordered_input_schema');
         else {
           const count = (item.inputs ?? []).filter((i) => i.kind === 'image').length;
           if (
@@ -487,7 +780,7 @@ export function planPresetCandidates({
           )
             candidate.missing_inputs.push(`${info.effect_type} image input(s)`);
         }
-        if ((cli_version ?? snapshot.cli_version) !== '1.4.8')
+        if (!templateVersionSupported(info, cli_version ?? snapshot.cli_version))
           candidate.unknown.push('versioned_ordered_input_output_contract');
       }
       candidate.status = candidate.mismatches.length
@@ -522,7 +815,7 @@ export function planPresetCandidates({
     selection_required: candidates.some((c) => c.status === 'candidate'),
     notes: [
       'Output constraints are compared, never overridden. Missing intermediate assets or identity/voice controls cannot be inferred from a preset name.',
-      'Modern ordered templates require captured field/result schemas; the generic model Create adapter is never used as a fallback.',
+      'Ordered templates use the verified CLI 1.4.9 field/result contract; the generic model Create adapter is never used as a fallback.',
     ],
   };
 }

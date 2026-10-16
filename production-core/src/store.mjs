@@ -447,7 +447,9 @@ export class Executor {
     );
     for (const result of results)
       if (!['completed', 'provider_failed'].includes(result.status)) {
-        const response = await this.adapters[intent.backend].status(intent, result.id);
+        const response = await this.adapters[intent.backend].status(intent, result.id, {
+          kind: result.kind,
+        });
         this.store.record(intent, response);
       }
     return this.store.job(id);
@@ -482,6 +484,7 @@ export class Executor {
         intent,
         providerId,
         destination,
+        { kind: result.kind },
       );
       this.store.record(intent, response);
       requireValue(

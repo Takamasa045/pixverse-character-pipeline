@@ -25,6 +25,7 @@ import {
 import { createCanvasAdapter } from './canvas.mjs';
 import { createPresetAdapter, resolvePresetIntent, planPresetCandidates } from './presets.mjs';
 import { renderDeliveries, locateIssue, editTimeline } from './finish.mjs';
+import { renderPlanPreview } from './preview.mjs';
 const argv = process.argv.slice(2),
   position = [],
   options = {};
@@ -123,6 +124,7 @@ async function main() {
         'status PROJECT --db DB',
         'costs PROJECT --db DB',
         'finish FILE --takes FILE --out DIR',
+        'rough-plan FILE --font FONT --out DIR [--variant ID] [--dry-run]',
         'issue FILE --start-ms N --end-ms N --kind CATEGORY',
         'export FILE --takes FILE --format shotpack|character --variant ID',
         'edit FILE --patch FILE',
@@ -155,6 +157,15 @@ async function main() {
       value = plan(p);
     return print(command === 'plan' ? value : { dry_run: true, provider_calls: 0, plan: value });
   }
+  if (command === 'rough-plan')
+    return print(
+      await renderPlanPreview(production(target), {
+        outputDir: resolve(required('out')),
+        fontPath: resolve(required('font')),
+        dryRun: flag('dry-run'),
+        variantId: typeof options.variant === 'string' ? options.variant : undefined,
+      }),
+    );
   if (command === 'finish')
     return print(
       await renderDeliveries(production(target), json(required('takes')), {

@@ -86,6 +86,7 @@ async function fixture() {
     path: video,
     sha256: await fileHash(video),
     status: 'accepted',
+    provenance: { context: { region: 'global', workspace_id: '0' } },
     qa: structuredClone(qa),
     stale: false,
   };
@@ -231,6 +232,8 @@ test('real local FFmpeg produces MP4, SRT, hashes, probe and manifest; repeat re
   production.assets.push({
     id: 'voice',
     kind: 'audio',
+    region: 'global',
+    workspace_id: '0',
     path: audio,
     sha256: await fileHash(audio),
     qa,
@@ -536,6 +539,8 @@ test(
     production.assets.push({
       id: 'burn-voice',
       kind: 'audio',
+      region: 'global',
+      workspace_id: '0',
       path: audio,
       sha256: await fileHash(audio),
       qa,

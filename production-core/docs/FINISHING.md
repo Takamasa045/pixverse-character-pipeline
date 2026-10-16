@@ -122,3 +122,69 @@ node --test production-core/test/finish.test.mjs
 ```
 
 The tests create tiny synthetic local media and cover real FFmpeg trims, still holds, audio mixing, explicit audio OFF checked in decoded PCM, SRT, dimensions/fps/duration, full decode, output hashes, language-specific subtitle revisions, reuse, time-range mapping, adoption/hash/stale gates, interrupted locks, source changes during rendering, and failed output/tool writes. With an existing font/Pillow runtime they also render Japanese/English burn-in over a narration mix, extract decoded pixels before/during/after the caption, and verify no visible text lies outside the safe area. A two-color image proves portrait crop selection while the horizontal output and source remain unchanged; losing an annotated subject blocks delivery. Quality tests verify measured silence, intentionally silent delivery, and explicit black/silence/loudness limits blocking before publication. Optional bitmap tests explicitly skip on hosts without a suitable installed runtime/font; capability-block tests cover the unavailable runtime path. These are local rendering/contract tests, not claims of real PixVerse generation quality.
+
+## Text-only plan preview before generation
+
+`renderPlanPreview(production, {outputDir, fontPath, dryRun, variantId?})` renders
+planned shot cards without accepted material. The CLI entry is:
+
+```sh
+./bin/production rough-plan production.json --font /path/to/existing-font.ttf --out ./planning-preview --variant ja-wide
+./bin/production rough-plan production.json --font /path/to/existing-font.ttf --out ./planning-preview --variant ja-wide --dry-run
+```
+
+This is the early check for order and tempo before paying for generated footage.
+Every card visibly says `PLANNING PREVIEW | SILENT PLACEHOLDERS` and
+`NOT GENERATED | NOT REVIEWED | NOT FINAL`. Cards show the original brief, intent,
+shot purpose, entry/exit state, camera, sound intent and planned time range. Sound
+intent is text only: the MP4 has no audio stream. The output contains no images,
+voices, performances or generated assets. It creates no Store entries, Takes,
+acceptance or QA records, and the final finishing gates above remain unchanged.
+Its manifest reports `status:'planning_preview'`, `adoption:'not_reviewed'`,
+`final_delivery:false`, `generation_jobs:0`, `provider_calls:0` and
+`source_media_used:false`.
+
+Choose a variant declared in the brief; multiple declared variants require an
+explicit selection. The selected variant's timeline clip order and durations
+are used when present, otherwise the planned shot order and edit durations are
+used. Every clip must identify a known shot, and their lengths must sum to the
+selected requested duration. Source media and timeline audio/captions are never
+opened. The preview follows the declared aspect, uses even dimensions with a
+maximum edge of 640 pixels, and requires at least 160×90 pixels for text. It uses
+the declared integer fps (1–60), or 10 if absent. Cumulative nearest-frame
+boundaries avoid drift; planned milliseconds, actual frame boundaries and a
+one-frame timing tolerance are recorded. Each card must occupy at least one
+frame. The text-only adapter supports at most 100 cards and 10 minutes.
+
+An explicit existing font, Python 3 with Pillow, FFmpeg and FFprobe are required
+for rendering; nothing is downloaded or installed. The library may select
+existing tools with `python`, `ffmpeg` and `ffprobe`. Text wraps and uses a measured
+8–22 pixel font to fit the card. Overflow rejects rather than truncating notes.
+Font coverage, shaping and reading comfort still need visual review. The manifest
+retains the exact rendered lines, measured glyph boxes, font digest, Pillow
+version, input fingerprint, output SHA-256, dimensions, duration and full decode
+result. These are technical preview observations, not final creative QA.
+
+Dry-run validates the document, selected duration and existing font bytes, then
+returns the intended paths and card specification. It writes no files and starts
+zero external processes, including capability probes. It reports
+`preview_rendered:false` and `font_layout_verified:false`; text layout and tool
+availability remain untested until rendering.
+
+Normal output is content addressed. The same specification and font bytes reuse
+an existing result only after the manifest's record hash, exact specification
+and MP4 SHA-256 match. Partial output, changed bytes or an existing lock block
+without overwriting or removing those files. Rendering uses an exclusive local
+lock and a private temporary directory; only that invocation's temporary files
+and lock are cleaned. Failed local tools never request generation. Production
+data and user source files remain unchanged.
+
+```sh
+node --test production-core/test/preview.test.mjs
+```
+
+The local tests render two tiny text cards and inspect decoded glyph pixels,
+shot changes, duration and absence of audio. They verify zero-process dry-run,
+variant selection, duration rejection, hash-checked reuse, source-file/data
+immutability, output collision/tampering, lock preservation and failure cleanup.
+Rendering tests explicitly skip if an existing font or local tool is absent.

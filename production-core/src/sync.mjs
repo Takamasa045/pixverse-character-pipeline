@@ -1,5 +1,8 @@
 import { mergeCanvasGraph } from './canvas.mjs';
 import { hash, requireValue } from './contracts.mjs';
+import { impactAnalysis } from './planner.mjs';
+import { validateTakeEvidence } from './review.mjs';
+import { performanceReview } from './character.mjs';
 /** Save a three-way sync as a new local revision. Conflicts never mutate the project. */
 export function syncCanvas(store, production, { base, local, remote, mappings, context }) {
   requireValue(Array.isArray(mappings), 'Canvas node to shot mapping required');
@@ -73,9 +76,15 @@ export function syncCanvas(store, production, { base, local, remote, mappings, c
       !latest || production.revision >= latest.revision,
       'Canvas sync source is older than the saved production',
     );
-    const staleShots = mappings
-      .filter((m) => merged.stale_node_ids.includes(m.node_id))
-      .map((m) => m.shot_id);
+    const importedShots = new Set(imports.map((take) => take.shot_id));
+    const staleShots = [
+      ...new Set([
+        ...mappings.filter((m) => merged.stale_node_ids.includes(m.node_id)).map((m) => m.shot_id),
+        ...impactAnalysis(production, [...importedShots]).shots.filter(
+          (id) => !importedShots.has(id),
+        ),
+      ]),
+    ];
     for (const take of store.takes(production.project_id))
       if (staleShots.includes(take.shot_id)) {
         store.putTake({
@@ -125,12 +134,56 @@ export function adoptTake(store, production, shotId, takeId) {
   );
   const shot = next.shots.find((s) => s.shot_id === shotId);
   requireValue(shot, 'shot not found');
+  requireValue(
+    typeof take.sha256 === 'string' && take.sha256.length > 0,
+    'accepted take content hash required',
+  );
+  const { entities } = validateTakeEvidence(store, take, production);
+  requireValue(
+    ['technical', 'creative', 'continuity'].every((key) => take.qa?.[key] === 'pass') &&
+      ['pass', 'not_applicable'].includes(take.qa?.audio),
+    'accepted take quality gates are incomplete',
+  );
+  const characters = entities.filter((entity) => entity.kind === 'character');
+  if (characters.length > 1)
+    requireValue(
+      performanceReview({ entities: characters }, take.qa?.entities ?? []).accepted,
+      'each visible character requires separate face/wardrobe/voice/position review',
+    );
+  const changed = shot.take_id !== take.id;
+  const downstream = new Set(
+    changed ? impactAnalysis(production, [shotId]).shots.filter((id) => id !== shotId) : [],
+  );
   shot.take_id = take.id;
   next.review_requirements = (next.review_requirements ?? []).filter((r) => r.shot_id !== shotId);
   next.revision++;
   for (const clip of next.timeline.clips) if (clip.shot_id === shotId) clip.take_id = take.id;
   for (const d of next.brief.deliveries ?? [])
     for (const clip of d.timeline?.clips ?? []) if (clip.shot_id === shotId) clip.take_id = take.id;
-  store.saveDocument('production', next);
-  return next;
+  next.review_requirements = [
+    ...next.review_requirements.filter((r) => !downstream.has(r.shot_id)),
+    ...[...downstream].map((shot_id) => ({
+      shot_id,
+      reason: 'Upstream adopted take changed',
+      regeneration_authorized: false,
+    })),
+  ];
+  return store.transaction(() => {
+    const latest = store.document('production', production.project_id);
+    requireValue(
+      !latest || next.revision === latest.revision + 1,
+      'adoption source is older than the saved production',
+    );
+    for (const affected of store.takes(production.project_id))
+      if (downstream.has(affected.shot_id)) {
+        store.putTake({ ...affected, stale: true, stale_reason: 'Upstream adopted take changed' });
+        store.event('stale', affected.id, { reason: 'Upstream adopted take changed' });
+      }
+    store.db
+      .prepare('INSERT INTO documents VALUES(?,?,?,?)')
+      .run('production', next.project_id, next.revision, JSON.stringify(next));
+    store.event('revision', next.project_id, { kind: 'production', revision: next.revision });
+    store.event('adopted', take.id, { shot_id: shotId, downstream: [...downstream] });
+    return next;
+  });
 }

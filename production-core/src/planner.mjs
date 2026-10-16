@@ -95,6 +95,8 @@ export function planProduction(production, { resolveIntent } = {}) {
         const resolved = resolveIntent({
           ...request,
           id: 'planning',
+          upper_credits: g.upper_credits ?? null,
+          price_evidence: g.price_evidence ?? null,
           capability_snapshot: snapshot,
           ...(g.backend === 'preset' ? { preset_snapshot: snapshot } : {}),
         });

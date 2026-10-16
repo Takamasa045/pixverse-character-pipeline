@@ -395,6 +395,7 @@ test('legacy export verifies adopted source bytes and reports edits the old cons
     schema_version: 'production.v1',
     project_id: 'film',
     revision: 2,
+    context,
     brief: {
       original: 'Film',
       deliveries: [
@@ -415,6 +416,7 @@ test('legacy export verifies adopted source bytes and reports edits the old cons
       project_id: 'film',
       shot_id: 's1',
       kind: 'video',
+      provenance: { context },
       path: 'existing.mp4',
       sha256: await fileHash(path.join(root, 'existing.mp4')),
       status: 'accepted',
@@ -470,6 +472,7 @@ test('legacy project and storyboard exports expose required staging and referenc
     schema_version: 'production.v1',
     project_id: 'film',
     revision: 2,
+    context,
     entities: [],
     assets: [],
     brief: {
@@ -501,6 +504,7 @@ test('legacy project and storyboard exports expose required staging and referenc
       project_id: 'film',
       shot_id: 's1',
       kind: 'video',
+      provenance: { context },
       path: 'existing.mp4',
       sha256: await fileHash(path.join(root, 'existing.mp4')),
       status: 'accepted',

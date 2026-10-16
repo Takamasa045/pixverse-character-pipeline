@@ -48,7 +48,7 @@ Character identity, wardrobe, voice and world each have stable IDs and immutable
 
 `./bin/production preset-candidates catalog.json` compares supplied current catalog snapshots against editing, output, duration and aspect requirements without provider calls. A selected `backend: "preset"` generation uses schema-validated MiniApps or a verified CLI 1.4.8 legacy template contract, with the same approval/ledger/resume gates. Inputs retain accepted asset provenance and actual uploaded media paths; no upload or authorization is implicit. See [ADAPTERS.md](../production-core/docs/ADAPTERS.md) for the snapshot schema.
 
-The modern CLI 1.4.9 ordered/fixed-output template execution path is conditionally blocked until its actual slot and result schemas can be read and tested. Candidate comparison reports this limitation; it never invents payloads, fixed outputs or editing capabilities.
+Ordered/fixed-output templates use the verified CLI 1.4.9 contract: typed ordered input slots, fixed output constraints and fixed-credit metadata are bound into the approved snapshot, then rechecked before submission. Mixed image/video outputs retain their individual kinds for status and download. Fixed-output templates do not support the Create idempotency flag; an unknown submission must stay blocked for reconciliation. CLI 1.4.8 cannot execute this path; select an existing verified 1.4.9 executable with `PIXVERSE_BIN` before planning and approval. Candidate comparison never grants generation permission.
 
 ## Generation approval and resume
 
@@ -179,3 +179,27 @@ Keep the original inputs, media, old Git revision and ledger before switching. T
 Run the repository's core tests and the representative fixtures before release. Include crash/resume, unknown voice submission, partial IDs, concurrent budget reservation, explicit OFF, contextual reference mismatch, Canvas conflicts/large IDs/unmanaged nodes, missing files and storage failures. Use fixtures for contract checks; separately authorized live tests are required for provider integration, exact prices, identity/voice retention, lip sync, local-edit side effects and final creative quality.
 
 The old reference documents are historical context. Their fixed model tables, mandatory three-view/I2I pipelines and old CLI pins are not current routing rules. Current capability schemas and the executed CLI binary take precedence. No current-generation or Canvas support is invented from a marketing example.
+
+## Continuous checks
+
+Both repositories run the dependency-free production-core suite and offline fixture entry points in GitHub Actions. The hosted test job uses Node 22 plus FFmpeg, Pillow and a local font; no PixVerse login, account secrets or paid generation is required. On the local Mac, use already installed tools and preserve user caches. The legacy Character renderer uses an isolated temporary bundle/public directory and an existing browser. Run it from a normal local shell; managed execution environments may need explicit browser-launch permission. Do not use the legacy CLI `--bundle-cache=false` as a no-delete option.
+
+For this workstation's isolated, verified CLI 1.4.9 runtime, when it has been provisioned locally, select it explicitly before planning:
+
+```bash
+export PIXVERSE_BIN="$PWD/.production/tools/pixverse-1.4.9/dist/index.js"
+"$PIXVERSE_BIN" --version
+```
+
+This ignored local runtime is not part of the repository or a fresh checkout. Other installations should point `PIXVERSE_BIN` at their own already installed, verified executable. No version is silently installed or authentication changed by the production core.
+
+## Check pacing before generating
+
+Create a silent text-card preview directly from a production plan, before adopted media exists:
+
+```bash
+./bin/production rough-plan production.json --font /path/to/existing-font.ttf --out previews --dry-run
+./bin/production rough-plan production.json --font /path/to/existing-font.ttf --out previews
+```
+
+Use `--variant DELIVERY_ID` when needed. Rendering requires already installed Python/Pillow and FFmpeg. Output is a `planning_preview`, `not_reviewed` MP4 and timing manifest; it never creates takes, QA or provider jobs. Final delivery still requires accepted sources. On a memory/storage-constrained machine, run core tests sequentially: `node --test --test-concurrency=1 production-core/test/*.test.mjs`.

@@ -29,7 +29,13 @@ const qa = {
   reviewer: 'independent-forward-fixture',
   notes: 'Local fixture contract evidence; no generated creative quality claim.',
 };
-const font = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf';
+const font = [
+  process.env.PRODUCTION_TEST_FONT,
+  '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+  '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+]
+  .filter(Boolean)
+  .find(existsSync);
 function production() {
   return {
     schema_version: 'production.v1',
@@ -285,6 +291,7 @@ test('continuation: protected subject loss and explicit silence policy block wit
       stale: false,
       qa,
       sha256: fileHash(video),
+      provenance: { context },
     };
   p.shots[0].take_id = take.id;
   p.timeline.clips = [

@@ -80,8 +80,13 @@ export interface AdapterResult {
 }
 export interface Adapter {
   submit(intent: GenerationIntent): Promise<AdapterResult>;
-  status(intent: GenerationIntent, id: string): Promise<AdapterResult>;
-  download(intent: GenerationIntent, id: string, destination: string): Promise<AdapterResult>;
+  status(intent: GenerationIntent, id: string, result?: { kind: string }): Promise<AdapterResult>;
+  download(
+    intent: GenerationIntent,
+    id: string,
+    destination: string,
+    result?: { kind: string },
+  ): Promise<AdapterResult>;
 }
 export interface EntityRevision {
   id: string;

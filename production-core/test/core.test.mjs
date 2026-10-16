@@ -286,7 +286,15 @@ test('missing file/completed/unreviewed or failed QA cannot be accepted', () => 
   const root = mkdtempSync(join(tmpdir(), 'production-review-')),
     path = join(root, 'clip');
   writeFileSync(path, 'fixture');
-  s.putTake({ id: 'a', status: 'downloaded', path, stale: false });
+  s.putTake({
+    id: 'a',
+    project_id: 'review-fixture',
+    shot_id: 'first',
+    status: 'downloaded',
+    path,
+    stale: false,
+    provenance: { context: { region: 'global', workspace_id: '0' } },
+  });
   const qa = {
     technical: 'pass',
     creative: 'fail',

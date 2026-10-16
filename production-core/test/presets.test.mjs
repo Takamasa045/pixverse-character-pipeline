@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { Store, Executor } from '../src/store.mjs';
 import {
   createPresetAdapter,
   resolvePresetIntent,
@@ -286,7 +290,7 @@ test('legacy template image output, ordered input and stable first-submission ke
   assert(m.calls[1].args.includes('--image'));
   assert(m.calls[1].args.includes('--idempotency-key'));
 });
-test('template missing inputs, output override and modern schema are rejected rather than fabricated', () => {
+test('legacy template missing inputs and output override reject; verified 1.4.9 legacy route works', () => {
   const intent = templateIntent();
   assert.throws(() => resolvePresetIntent({ ...intent, inputs: [] }), /one image/);
   assert.throws(
@@ -294,7 +298,315 @@ test('template missing inputs, output override and modern schema are rejected ra
     /override is not verified/,
   );
   intent.preset_snapshot.cli_version = '1.4.9';
-  assert.throws(() => resolvePresetIntent(intent), /versioned input\/output schema/);
+  assert.equal(resolvePresetIntent(intent).output_kind, 'image');
   const plan = planPresetCandidates({ templates: [intent.preset_snapshot], cli_version: '1.4.9' });
-  assert(plan.candidates[0].unknown.includes('versioned_ordered_input_output_contract'));
+  assert.equal(plan.candidates[0].execution_supported, true);
+});
+
+const modernFixture = JSON.parse(
+  readFileSync(new URL('../fixtures/ordered-template-contract.json', import.meta.url)),
+);
+function modernIntent() {
+  return {
+    id: 'ordered-fixture',
+    project_id: 'preset-project',
+    shot_id: 'effect',
+    attempt: 1,
+    backend: 'preset',
+    mode: 'template',
+    model: null,
+    preset_id: '12345',
+    output_kind: 'video',
+    context,
+    upper_credits: 220,
+    price_evidence: { surface: 'cli', source: 'neutral fixed_cost fixture' },
+    parameters: {},
+    inputs: [{ kind: 'image', path: '/local/required.png', size_bytes: 10, ...context }],
+    preset_snapshot: { info: structuredClone(modernFixture.info), context, cli_version: '1.4.9' },
+  };
+}
+test('ordered template maps required and optional images exactly, preserving explicit empty slots', () => {
+  const i = modernIntent();
+  assert.deepEqual(resolvePresetIntent(i).parameters.image, ['', '/local/required.png']);
+  assert.deepEqual(
+    resolvePresetIntent({ ...i, parameters: { image: ['', '/local/required.png'] } }).parameters
+      .image,
+    ['', '/local/required.png'],
+  );
+  i.inputs[0].parameter = 'fixture-required';
+  assert.deepEqual(resolvePresetIntent(i).parameters.image, ['', '/local/required.png']);
+  i.inputs.unshift({
+    kind: 'image',
+    path: '/local/optional.png',
+    size_bytes: 10,
+    ...context,
+    parameter: 'fixture-optional',
+  });
+  assert.deepEqual(resolvePresetIntent(i).parameters.image, [
+    '/local/optional.png',
+    '/local/required.png',
+  ]);
+  const slots = i.preset_snapshot.info.input_fields;
+  slots.splice(1, 0, {
+    name: 'Later optional',
+    node_id: 'later',
+    content_type: 'image',
+    required: false,
+    max_size: 100,
+  });
+  i.inputs[0].parameter = 'later';
+  assert.throws(() => resolvePresetIntent(i), /Optional image selection/);
+});
+test('ordered fixed settings reject overrides, missing budgets, old CLI and mismatched declared output', () => {
+  for (const key of [
+    'quality',
+    'duration',
+    'aspect_ratio',
+    'seed',
+    'count',
+    'off_peak',
+    'idempotency_key',
+  ])
+    assert.throws(
+      () =>
+        resolvePresetIntent({
+          ...modernIntent(),
+          parameters: { [key]: key === 'off_peak' ? false : 1 },
+        }),
+      /override/,
+    );
+  for (const upper_credits of [null, 219, undefined])
+    assert.throws(
+      () => resolvePresetIntent({ ...modernIntent(), upper_credits }),
+      /fixed template cost/,
+    );
+  const i = modernIntent();
+  i.preset_snapshot.cli_version = '1.4.8';
+  assert.throws(() => resolvePresetIntent(i), /1\.4\.8 cannot submit/);
+  assert.throws(
+    () => resolvePresetIntent({ ...modernIntent(), output_kind: 'image' }),
+    /absent from template/,
+  );
+});
+test('ordered references enforce exact slot context, size, video duration and explicit text limits', () => {
+  const i = modernIntent();
+  assert.throws(() => resolvePresetIntent({ ...i, inputs: [] }), /required ordered image/);
+  assert.throws(
+    () => resolvePresetIntent({ ...i, inputs: [{ ...i.inputs[0], size_bytes: undefined }] }),
+    /size/,
+  );
+  assert.throws(
+    () => resolvePresetIntent({ ...i, inputs: [{ ...i.inputs[0], size_bytes: 40000000 }] }),
+    /size/,
+  );
+  assert.throws(
+    () => resolvePresetIntent({ ...i, parameters: { prompt: 'x'.repeat(5001) } }),
+    /silent truncation/,
+  );
+  i.preset_snapshot.info.input_fields.push({
+    name: 'Video',
+    node_id: 'vid',
+    content_type: 'video',
+    required: true,
+    max_size: 100,
+    min_duration: 1,
+    max_duration: 3,
+  });
+  i.inputs.push({
+    kind: 'video',
+    provider_id: '999',
+    size_bytes: 10,
+    duration_ms: 2000,
+    ...context,
+  });
+  assert.equal(resolvePresetIntent(i).parameters.video, '999');
+  i.inputs[1].duration_ms = 4000;
+  assert.throws(() => resolvePresetIntent(i), /video duration/);
+  i.inputs[1].duration_ms = 2000;
+  i.preset_snapshot.info.input_fields.push({
+    name: 'Video2',
+    content_type: 'video',
+    required: false,
+  });
+  assert.throws(() => resolvePresetIntent(i), /more video\/text/);
+});
+test('ordered candidate comparison binds declared output settings and cost without provider calls', () => {
+  const i = modernIntent(),
+    snapshot = i.preset_snapshot;
+  snapshot.available = true;
+  snapshot.analysis = {
+    evidence: { source: 'neutral test', info_sha256: presetSnapshotHash(snapshot.info) },
+    output: { fixed_duration_ms: 5000 },
+  };
+  const p = planPresetCandidates({
+    requirements: { duration_ms: 5000, output_kind: 'video', aspects: ['9:16'] },
+    templates: [{ ...snapshot, inputs: i.inputs }],
+  });
+  assert.equal(p.provider_calls, 0);
+  assert.equal(p.candidates[0].execution_supported, true);
+  assert.equal(p.candidates[0].fixed_cost_credits, 220);
+  assert.equal(p.candidates[0].output.fixed_duration_ms, 10000);
+  assert.equal(p.candidates[0].status, 'incompatible');
+  assert.equal(p.candidates[0].execution_permitted, false);
+  snapshot.info.output = [];
+  assert(
+    planPresetCandidates({ templates: [snapshot] }).candidates[0].unknown.includes(
+      'fixed_output_schema',
+    ),
+  );
+});
+test('ordered submissions preserve mixed output IDs and omit all fixed-control overrides', async () => {
+  const i = modernIntent(),
+    m = mocked([
+      { exit_code: 0, stdout: '1.4.9' },
+      { exit_code: 0, raw: modernFixture.submission_response },
+    ]);
+  const out = await createPresetAdapter({
+    run: m.run,
+    infoProvider: async () => i.preset_snapshot.info,
+  }).submit(i);
+  assert.deepEqual(
+    out.results.map((r) => [r.id, r.kind]),
+    [
+      ['111', 'video'],
+      ['112', 'image'],
+    ],
+  );
+  assert(!m.calls[1].args.includes('--idempotency-key'));
+  assert(!m.calls[1].args.includes('--count'));
+  assert.deepEqual(
+    m.calls[1].args.slice(
+      m.calls[1].args.indexOf('--image') + 1,
+      m.calls[1].args.indexOf('--no-wait'),
+    ),
+    ['', '/local/required.png'],
+  );
+  assert(out.results.every((r) => r.cost_credits === undefined));
+});
+test('partial ordered result retains all valid IDs and an unknown-type ID without automatic retry', async () => {
+  const i = modernIntent(),
+    raw = structuredClone(modernFixture.partial_response);
+  raw.response.outputs.push({ media_id: 113, media_type: 'unverified' });
+  const m = mocked([
+    { exit_code: 0, stdout: '1.4.9' },
+    { exit_code: 1, raw },
+  ]);
+  const out = await createPresetAdapter({
+    run: m.run,
+    infoProvider: async () => i.preset_snapshot.info,
+  }).submit(i);
+  assert.deepEqual(
+    out.results.map((r) => [r.id, r.kind]),
+    [
+      ['111', 'video'],
+      ['113', 'unknown'],
+    ],
+  );
+  assert(out.error);
+  assert.equal(m.calls.length, 2);
+});
+test('ordered schema and fixed cost drift reject before submission', async () => {
+  const i = modernIntent(),
+    m = mocked([{ exit_code: 0, stdout: '1.4.9' }]);
+  await assert.rejects(
+    () =>
+      createPresetAdapter({
+        run: m.run,
+        infoProvider: async () => ({ ...i.preset_snapshot.info, fixed_cost: 221 }),
+      }).submit(i),
+    /changed after approval/,
+  );
+  assert.equal(m.calls.length, 1);
+});
+test('ordered mixed outputs survive DB restart and failed download; resume/download use stored kinds with one submission', async () => {
+  const i = modernIntent(),
+    dir = mkdtempSync(join(tmpdir(), 'ordered-ledger-')),
+    db = join(dir, 'db.sqlite'),
+    calls = [];
+  let failDownload = true;
+  const adapter = createPresetAdapter({
+    infoProvider: async () => i.preset_snapshot.info,
+    run: async (args) => {
+      calls.push(args);
+      if (args[0] === '--version') return { exit_code: 0, stdout: '1.4.9' };
+      if (args[0] === 'create') return { exit_code: 0, raw: modernFixture.submission_response };
+      if (args[0] === 'task') return { exit_code: 0, raw: { status: 'completed' } };
+      if (args[0] === 'asset') {
+        if (failDownload) {
+          failDownload = false;
+          throw new Error('local storage unavailable');
+        }
+        const f = join(dir, args[2] + '.fixture');
+        writeFileSync(f, 'local synthetic bytes');
+        return { exit_code: 0, raw: { file: f } };
+      }
+      throw new Error('Unexpected command ' + args.join(' '));
+    },
+  });
+  const plan = {
+    id: 'ordered-plan',
+    project_id: i.project_id,
+    intents: [i],
+    blocked: [],
+    generation_permitted: true,
+    total_upper_credits: 220,
+    policy: { max_credits: 220, max_attempts: 1 },
+  };
+  let s = new Store(db),
+    e = new Executor(s, { preset: adapter });
+  const approval = s.approve(plan, 'fixture reviewer');
+  await e.run(plan, { approval: approval.id });
+  s.close();
+  s = new Store(db);
+  e = new Executor(s, { preset: adapter });
+  await e.run(plan, { approval: approval.id });
+  await e.resume(i.id);
+  assert.deepEqual(
+    s.results(i.id).map((r) => [r.id, r.kind, r.status]),
+    [
+      ['111', 'video', 'completed'],
+      ['112', 'image', 'completed'],
+    ],
+  );
+  await assert.rejects(() => e.download(i.id, '112', dir), /storage unavailable/);
+  await e.run(plan, { approval: approval.id });
+  await e.download(i.id, '112', dir);
+  await e.download(i.id, '111', dir);
+  assert.equal(calls.filter((a) => a[0] === 'create').length, 1);
+  assert.deepEqual(
+    calls.filter((a) => a[0] === 'task').map((a) => [a[2], a[a.indexOf('--type') + 1]]),
+    [
+      ['111', 'video'],
+      ['112', 'image'],
+    ],
+  );
+  assert.deepEqual(
+    calls.filter((a) => a[0] === 'asset').map((a) => [a[2], a[a.indexOf('--type') + 1]]),
+    [
+      ['112', 'image'],
+      ['112', 'image'],
+      ['111', 'video'],
+    ],
+  );
+  assert.equal(s.costReport(i.project_id).actual_credits, null);
+  assert.equal(s.exposure(i.project_id), 220);
+  s.close();
+});
+
+test('ordered unknown fixed metadata cannot be filled by conflicting local analysis', () => {
+  const i = modernIntent(),
+    snap = i.preset_snapshot;
+  snap.info.output = [{ type: 'video' }];
+  snap.analysis = {
+    evidence: { source: 'fixture attestation', info_sha256: presetSnapshotHash(snap.info) },
+    output: { fixed_duration_ms: 1000, aspects: ['1:1'] },
+  };
+  const p = planPresetCandidates({
+    requirements: { duration_ms: 1000, aspects: ['1:1'] },
+    templates: [snap],
+  });
+  assert.equal(p.candidates[0].output.fixed_duration_ms, null);
+  assert.equal(p.candidates[0].output.aspects, null);
+  assert(p.candidates[0].unknown.includes('duration_ms'));
+  assert(p.candidates[0].unknown.includes('aspects'));
 });

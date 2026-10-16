@@ -3,6 +3,44 @@ import { performanceReview } from './character.mjs';
 import { existsSync } from 'node:fs';
 import { downloadCanvasSelection } from './canvas.mjs';
 import { impactAnalysis } from './planner.mjs';
+export function requireMatchingContext(context, expected) {
+  requireValue(
+    ['global', 'cn'].includes(context?.region) &&
+      typeof context?.workspace_id === 'string' &&
+      context.workspace_id.trim().length > 0,
+    'take/source context is unknown; confirm region and workspace before acceptance',
+  );
+  if (expected)
+    requireValue(
+      context.region === expected.region && context.workspace_id === expected.workspace_id,
+      'take/source context differs from production region/workspace',
+    );
+}
+export function validateTakeEvidence(store, take, production) {
+  if (production) requireMatchingContext(production.context);
+  requireMatchingContext(take.provenance?.context, production?.context);
+  const actual = fileHash(take.path);
+  requireValue(
+    !take.sha256 || take.sha256 === actual,
+    'take bytes changed; register a new take rather than replacing its accepted source',
+  );
+  const pinned =
+    production?.shots?.find((shot) => shot.shot_id === take.shot_id)?.entity_revisions ?? [];
+  const recorded = take.provenance?.entity_revisions ?? [];
+  const identity = (refs) => refs.map((ref) => `${ref.id}:${ref.revision}`).sort();
+  if (pinned.length)
+    requireValue(
+      hash(identity(pinned)) === hash(identity(recorded)),
+      'take entity revisions differ from the pinned shot revisions',
+    );
+  const entities = recorded.map((ref) => {
+    const entity = store.document('entity', ref.id, ref.revision);
+    requireValue(entity, 'pinned entity revision is missing from the shared registry');
+    requireMatchingContext(entity.context, take.provenance.context);
+    return entity;
+  });
+  return { actual, entities };
+}
 export function reviewTake(store, id, qa, { accept = false, reevaluate = false } = {}) {
   const take = store.take(id);
   requireValue(take, 'take not found');
@@ -10,7 +48,16 @@ export function reviewTake(store, id, qa, { accept = false, reevaluate = false }
     ['downloaded', 'reviewed', 'accepted'].includes(take.status),
     'download and inspect the take before review',
   );
-  requireValue(take.path && fileHash(take.path), 'take file missing');
+  requireValue(take.path, 'take file missing');
+  requireValue(
+    typeof take.project_id === 'string' && take.project_id.length > 0,
+    'take project identity required',
+  );
+  const { actual, entities } = validateTakeEvidence(
+    store,
+    take,
+    store.document('production', take.project_id),
+  );
   requireValue(
     typeof qa.reviewer === 'string' && qa.reviewer && typeof qa.notes === 'string',
     'reviewer and notes required',
@@ -24,19 +71,17 @@ export function reviewTake(store, id, qa, { accept = false, reevaluate = false }
         ['pass', 'not_applicable'].includes(qa.audio),
       'quality gate failed',
     );
-    const entities = (take.provenance?.entity_revisions ?? [])
-      .map((e) => store.document('entity', e.id, e.revision))
-      .filter((e) => e?.kind === 'character');
-    if (entities.length > 1)
+    const characters = entities.filter((e) => e.kind === 'character');
+    if (characters.length > 1)
       requireValue(
-        performanceReview({ entities }, qa.entities ?? []).accepted,
+        performanceReview({ entities: characters }, qa.entities ?? []).accepted,
         'each visible character requires separate face/wardrobe/voice/position review',
       );
   }
   return store.transaction(() => {
     const next = {
       ...take,
-      sha256: fileHash(take.path),
+      sha256: actual,
       qa,
       stale: reevaluate ? false : take.stale,
       status: accept ? 'accepted' : 'reviewed',

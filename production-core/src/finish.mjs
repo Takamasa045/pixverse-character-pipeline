@@ -1,3 +1,4 @@
+import { requireMatchingContext } from './review.mjs';
 // Local-only finishing. This module never submits jobs or changes adopted takes.
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -288,6 +289,11 @@ export async function inspectDelivery(production, takes, options = {}) {
     caption_layouts = [],
     deliveries = production.brief?.deliveries || [];
   const add = (code, detail = {}) => issues.push({ code, ...detail });
+  try {
+    requireMatchingContext(production.context);
+  } catch (error) {
+    add('PRODUCTION_CONTEXT_INVALID', { message: error.message });
+  }
   if (production.schema_version !== 'production.v1') add('SCHEMA_UNSUPPORTED');
   if (
     typeof production.project_id !== 'string' ||
@@ -311,6 +317,16 @@ export async function inspectDelivery(production, takes, options = {}) {
   const probe = options.probe || ((file) => probeMedia(file, options));
   const seenSources = new Map();
   async function inspectSource(source, kind, identity) {
+    try {
+      const context =
+        source?.provenance?.context ??
+        (source?.region !== undefined || source?.workspace_id !== undefined
+          ? { region: source.region, workspace_id: source.workspace_id }
+          : undefined);
+      requireMatchingContext(context, production.context);
+    } catch (error) {
+      add('SOURCE_CONTEXT_INVALID', { source_id: identity, message: error.message });
+    }
     const key = `${identity}:${source?.path}`;
     if (seenSources.has(key)) return seenSources.get(key);
     if (!source?.path) {
@@ -345,6 +361,12 @@ export async function inspectDelivery(production, takes, options = {}) {
   )) {
     const timeline = selectedTimeline(production, delivery);
     const duration = timeline.clips.reduce((n, c) => n + (Number(c.duration_ms) || 0), 0);
+    for (const requirement of production.review_requirements ?? [])
+      if (timeline.clips.some((clip) => clip.shot_id === requirement.shot_id))
+        add('DEPENDENCY_REVIEW_REQUIRED', {
+          delivery_id: delivery.id,
+          shot_id: requirement.shot_id,
+        });
     if (
       !delivery.id ||
       !Number.isInteger(delivery.width) ||
@@ -402,6 +424,11 @@ export async function inspectDelivery(production, takes, options = {}) {
       }
       if (shot?.take_id && shot.take_id !== take.id)
         add('ADOPTED_TAKE_MISMATCH', { shot_id: clip.shot_id, take_id: clip.take_id });
+      const pinned = shot?.entity_revisions ?? [];
+      const recorded = take.provenance?.entity_revisions ?? [];
+      const entityIdentity = (refs) => refs.map((ref) => `${ref.id}:${ref.revision}`).sort();
+      if (pinned.length && digest(entityIdentity(pinned)) !== digest(entityIdentity(recorded)))
+        add('TAKE_ENTITY_REVISIONS_MISMATCH', { take_id: take.id, shot_id: clip.shot_id });
       if (take.status !== 'accepted' || take.stale !== false || !qaPass(take.qa))
         add('TAKE_NOT_ACCEPTED', { take_id: take.id });
       if (!['image', 'video'].includes(take.kind))

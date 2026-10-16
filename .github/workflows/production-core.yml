@@ -1,0 +1,33 @@
+name: Production core
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  production-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Local media test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg python3-pil fonts-dejavu-core
+          mkdir -p "$RUNNER_TEMP/media-tools"
+          ln -s /usr/bin/python3 "$RUNNER_TEMP/media-tools/python3"
+          echo "$RUNNER_TEMP/media-tools" >> "$GITHUB_PATH"
+      - name: Contract, fault, resume and real local finishing tests
+        run: node --test production-core/test/*.test.mjs
+      - name: Offline entry points
+        run: |
+          for fixture in production-core/fixtures/station-story.json production-core/fixtures/weekly-guide.json production-core/fixtures/bottle-action.json; do
+            ./bin/production validate "$fixture"
+            ./bin/production run "$fixture" --dry-run > /dev/null
+          done

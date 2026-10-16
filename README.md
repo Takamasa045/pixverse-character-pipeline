@@ -29,6 +29,8 @@ Use **Node >=22.18**. Validation, planning, fixture tests and dry-run need no np
 node --test production-core/test/*.test.mjs
 ```
 
+For an early pacing check before generation, `rough-plan production.json --font /path/to/existing-font.ttf --out previews` renders silent text cards with existing FFmpeg/Pillow. Its MP4 is a planning preview, not an adopted final delivery.
+
 The included fixtures are planning-only: attach accepted references, real context, capability snapshots and price evidence before any generation. The default Canvas adapter saves verified selected media over bounded HTTPS transport; selection changes and unsafe/unavailable URLs block completion.
 
 See the [operator guide](references/production-v1.md) for character registration, approved runs, resume, finishing, migration and three acceptance scenarios. Exact fields are in [the core contract](production-core/docs/CONTRACT.md). When both entries operate on one production, give them the same explicit SQLite `--db` path.

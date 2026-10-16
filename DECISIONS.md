@@ -422,3 +422,7 @@ Old entry-point documents are retained verbatim under `references/legacy-*.md`. 
 Paid work requires a concrete approved scope and upper credits; valid authorization covers its scope. Unknown submission blocks automatic resend. Known IDs resume without a new submit. Voice/music tracing is not provider deduplication. Explicit false is preserved. Completion is distinct from accepted take and checked local delivery.
 
 No mandatory three-view/I2I stage, universal image-first rule, fixed model table or Remotion-first architecture remains in the active entry. TTS is narration unless an independent verified synchronization path proves otherwise. Fixture tests prove contracts; creative quality, precise prices and provider behavior require a separately approved live evaluation.
+
+## 2026-10-16 — Legacy render isolation
+
+Use the installed public bundler API with `enableCaching:false` and a unique temporary bundle/public directory. Remotion CLI `--bundle-cache=false` in the legacy version deletes existing caches and must not be used as a cache-preservation mechanism. Stage only referenced local files, reject path escapes, and keep sandbox and origin protections in Chromium. Choose an existing browser explicitly when needed; never download one implicitly. A managed execution sandbox may block browser launch even when the same binary works from the normal local shell.

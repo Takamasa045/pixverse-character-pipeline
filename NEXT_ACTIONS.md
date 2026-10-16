@@ -16,4 +16,4 @@ Measure adoption/identity failure, continuity issues, unrelated regeneration, du
 
 ## Optional extensions
 
-Add more model, finishing, template/MiniApp or synchronization paths only with current capability evidence and regression coverage. Exact dialogue with a visible face remains unsupported unless a verified adapter meets that requirement. Preserve storage safety; do not delete caches or original assets to make room.
+Template/MiniApp execution, when selected for a brief, requires its actual versioned input/output contract and regression coverage; it is not merely an optional future improvement. Add more model, advanced finishing or synchronization paths only with current capability evidence and regression coverage. Exact dialogue with a visible face remains unsupported unless a verified adapter meets that requirement. Preserve storage safety; do not delete caches or original assets to make room.

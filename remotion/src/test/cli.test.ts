@@ -7,6 +7,7 @@ import { runCommand } from "../lib/subprocess";
 
 const repoRoot = resolve(process.cwd(), "..");
 const outputRoot = resolve(repoRoot, "output");
+const fixtureRunId = (name: string): string => `${name}-${process.pid}-${Date.now()}`;
 // The v3 runtime remains an explicit compatibility entry after production.v1 becomes default.
 const pipelineBin = "./bin/pipeline-legacy";
 
@@ -50,7 +51,7 @@ test("pipeline validate and plan succeed for fixture config", async () => {
 });
 
 test("pipeline run dry-run writes a manifest", async () => {
-  const runId = "dry-run-test";
+  const runId = fixtureRunId("dry-run-test");
   const runDir = resolve(outputRoot, "mixed-generated", runId);
   await rm(runDir, { force: true, recursive: true });
 
@@ -82,7 +83,7 @@ test("pipeline run dry-run writes a manifest", async () => {
 });
 
 test("pipeline run dry-run can write a Michibiki handoff", async () => {
-  const runId = "michibiki-handoff-test";
+  const runId = fixtureRunId("michibiki-handoff-test");
   const runDir = resolve(outputRoot, "mixed-generated", runId);
   await rm(runDir, { force: true, recursive: true });
 
@@ -127,7 +128,7 @@ test("pipeline run dry-run can write a Michibiki handoff", async () => {
 });
 
 test("pipeline export writes a Michibiki VideoSpec for downstream project generation", async () => {
-  const handoffDir = resolve(outputRoot, "mixed-generated", "michibiki-export-test");
+  const handoffDir = resolve(outputRoot, "mixed-generated", fixtureRunId("michibiki-export-test"));
   await rm(handoffDir, { force: true, recursive: true });
 
   const result = await runCommand(
@@ -176,7 +177,7 @@ test("pipeline export writes a Michibiki VideoSpec for downstream project genera
 });
 
 test("pipeline run dry-run allows generated clips without narration", async () => {
-  const runId = "silent-generated-dry-run";
+  const runId = fixtureRunId("silent-generated-dry-run");
   const runDir = resolve(outputRoot, "silent-generated", runId);
   await rm(runDir, { force: true, recursive: true });
 
@@ -211,7 +212,7 @@ test("pipeline run dry-run treats audioFile narration as local asset, not voice 
     await rm(tempDir, { force: true, recursive: true });
   });
 
-  const runId = "audio-file-dry-run";
+  const runId = fixtureRunId("audio-file-dry-run");
   const runDir = resolve(outputRoot, "audio-file-narration", runId);
   await rm(runDir, { force: true, recursive: true });
 
@@ -282,7 +283,7 @@ generation:
 });
 
 test("pipeline run dry-run supports reference clips without invoking PixVerse", async () => {
-  const runId = "reference-story-dry-run";
+  const runId = fixtureRunId("reference-story-dry-run");
   const runDir = resolve(outputRoot, "reference-story-fixture", runId);
   await rm(runDir, { force: true, recursive: true });
 
@@ -327,7 +328,7 @@ test("pipeline render rejects reference clips", async () => {
 });
 
 test("pipeline render produces an mp4 for local assets", async () => {
-  const runId = "render-smoke";
+  const runId = fixtureRunId("render-smoke");
   const runDir = resolve(outputRoot, "local-smoke", runId);
   await rm(runDir, { force: true, recursive: true });
 
