@@ -13,7 +13,14 @@ import {
   audioRoute,
   performanceReview,
 } from '../src/character.mjs';
-import { reviewTake, registerLocalTake, reviewDelivery } from '../src/review.mjs';
+import {
+  reviewTake,
+  registerLocalTake,
+  reviewDelivery,
+  markStale,
+  downloadSelectedTake,
+} from '../src/review.mjs';
+import { syncCanvas } from '../src/sync.mjs';
 import { fileHash } from '../src/contracts.mjs';
 export function project() {
   return {
@@ -500,4 +507,141 @@ test('local media enters the same ledger without invented QA; final review rejec
   writeFileSync(path, 'changed bytes');
   assert.throws(() => reviewDelivery(bundle, qa), /changed/);
   s.close();
+});
+
+test('asset and entity edits propagate through shot to downstream dependency nodes', () => {
+  const p = project();
+  p.shots[0].references = [{ asset: 'face', role: 'identity', order: 0 }];
+  p.dependencies = [
+    { id: 'edit', depends_on: ['wait'] },
+    { id: 'export', depends_on: ['edit'] },
+  ];
+  const impact = impactAnalysis(p, ['face']);
+  assert(impact.stale.includes('wait'));
+  assert(impact.stale.includes('export'));
+  assert.equal(impact.regeneration_authorized, false);
+  const store = new Store(':memory:');
+  store.putTake({
+    id: 'old',
+    project_id: p.project_id,
+    shot_id: 'wait',
+    status: 'accepted',
+    stale: false,
+    provenance: { entity_revisions: [{ id: 'cat', revision: 1 }] },
+  });
+  assert.deepEqual(
+    markStale(store, p.project_id, { entityIds: ['cat'] }, 'requested contract update').takes,
+    ['old'],
+  );
+  assert.equal(store.take('old').stale, true);
+  store.close();
+});
+
+test('Canvas human upstream selection invalidates mapped downstream takes without generation', () => {
+  const p = project(),
+    store = new Store(':memory:');
+  store.saveDocument('production', p);
+  store.putTake({
+    id: 'downstream',
+    project_id: p.project_id,
+    shot_id: 'smile',
+    status: 'accepted',
+    stale: false,
+  });
+  const base = {
+    project_id: '99',
+    edit_version: 1,
+    nodes: [
+      { node_id: 'ref', node_type: 'image_generate', source: 'agent', history_id: '100' },
+      {
+        node_id: 'clip',
+        node_type: 'video_generate',
+        source: 'agent',
+        history_id: '200',
+        depends_on: ['ref'],
+      },
+    ],
+    edges: [{ source: 'ref', target: 'clip' }],
+  };
+  const remote = structuredClone(base);
+  remote.edit_version = 2;
+  remote.nodes[0].history_id = '101';
+  const result = syncCanvas(store, p, {
+    base,
+    local: base,
+    remote,
+    context: p.context,
+    mappings: [
+      { node_id: 'ref', shot_id: 'wait', kind: 'image' },
+      { node_id: 'clip', shot_id: 'smile', kind: 'video' },
+    ],
+  });
+  assert.equal(result.applied, true);
+  assert.equal(store.take('downstream').stale, true);
+  assert.equal(result.production.review_requirements[0].shot_id, 'smile');
+  assert.equal(store.jobs(p.project_id).length, 0);
+  store.close();
+});
+
+test('recorded Canvas selection downloads via default transport with injected bytes, not Create', async () => {
+  const store = new Store(':memory:'),
+    directory = mkdtempSync(join(tmpdir(), 'canvas-take-'));
+  const calls = [];
+  store.putTake({
+    id: 'selected',
+    project_id: 'station',
+    shot_id: 'wait',
+    kind: 'image',
+    status: 'completed',
+    stale: false,
+    qa: null,
+    provenance: {
+      backend: 'canvas',
+      project_id: '999999999999999999999',
+      node_id: 'reference',
+      history_id: '888888888888888888888',
+      context: { region: 'global', workspace_id: '0' },
+    },
+  });
+  const run = async (args) => {
+    calls.push(args);
+    return {
+      exit_code: 0,
+      raw: {
+        node: {
+          node_id: 'reference',
+          derived_state: 'SUCCEEDED',
+          history_id: '888888888888888888888',
+          file_path: 'https://example.test/reference.ppm',
+        },
+      },
+    };
+  };
+  const bytes = 'P3\n2 2\n255\n255 0 0 0 255 0 0 0 255 255 255 0\n';
+  let transfers = 0;
+  const result = await downloadSelectedTake(store, 'selected', directory, {
+    run,
+    downloadOptions: {
+      reserveBytes: 0,
+      fetchImpl: async () => {
+        transfers++;
+        return new Response(bytes, {
+          status: 200,
+          headers: {
+            'content-type': 'image/x-portable-pixmap',
+            'content-length': String(Buffer.byteLength(bytes)),
+          },
+        });
+      },
+    },
+  });
+  assert.equal(result.status, 'downloaded');
+  assert.equal(result.sha256, fileHash(result.path));
+  assert.equal(result.qa, null);
+  assert.equal(calls.length, 2);
+  assert(calls.every((args) => args[0] === 'canvas' && args.includes('get')));
+  await downloadSelectedTake(store, 'selected', directory, { run });
+  assert.equal(transfers, 1);
+  assert.equal(store.jobs('station').length, 0);
+  store.close();
 });

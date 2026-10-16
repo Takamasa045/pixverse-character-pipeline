@@ -29,7 +29,7 @@ Use **Node >=22.18**. Validation, planning, fixture tests and dry-run need no np
 node --test production-core/test/*.test.mjs
 ```
 
-The included fixtures are planning-only: attach accepted references, real context, capability snapshots and price evidence before any generation. The default Canvas adapter requires a separately configured media download transport; it does not download media out of the box.
+The included fixtures are planning-only: attach accepted references, real context, capability snapshots and price evidence before any generation. The default Canvas adapter saves verified selected media over bounded HTTPS transport; selection changes and unsafe/unavailable URLs block completion.
 
 See the [operator guide](references/production-v1.md) for character registration, approved runs, resume, finishing, migration and three acceptance scenarios. Exact fields are in [the core contract](production-core/docs/CONTRACT.md). When both entries operate on one production, give them the same explicit SQLite `--db` path.
 
@@ -37,7 +37,7 @@ See the [operator guide](references/production-v1.md) for character registration
 
 The core uses immutable entity revisions, resolved intent hashes, durable submission records, budget reservation, adopted takes and scoped invalidation. `completed` and `accepted` are separate. Known task IDs are resumed; uncertain submissions are blocked for reconciliation rather than automatically submitted again. Explicit `false` controls stay off. Canvas human edits must be merged without silent overwrite or a hidden Create submission.
 
-Provider capabilities vary by account, region, model and mode. Fixture/mock success validates contracts, not picture quality, voice fidelity, lip sync, exact prices or every Canvas feature. Independent TTS over video is narration. The local FFmpeg/ffprobe adapter supports cuts, trim, fit/pad, audio mixing and SRT sidecars; crop, effects, styled/burned-in captions and complex transitions are blocked. Final creative review remains pending after technical render checks.
+Provider capabilities vary by account, region, model and mode. Fixture/mock success validates contracts, not picture quality, voice fidelity, lip sync, exact prices or every Canvas feature. Independent TTS over video is narration. The local FFmpeg/ffprobe adapter supports cuts, trim, explicit crops with protected regions, fit/pad, audio mixing, SRT and basic safe-area subtitle burn-in using an existing Python/Pillow runtime and supplied font. It measures black/silence intervals and volume, with explicit optional rejection thresholds. Complex effects and transitions remain blocked. Final creative review remains pending after technical render checks.
 
 ## Existing projects and rollback
 

@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { inspectMediaQuality, evaluateQuality } from './quality.mjs';
 
 const clone = (value) => structuredClone(value);
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -30,9 +31,10 @@ const selectedTimeline = (production, delivery) =>
   Object.fromEntries(
     ['clips', 'audio', 'captions'].map((key) => [
       key,
-      (delivery.timeline?.[key] ?? production.timeline?.[key] ?? []).filter((item) =>
-        relevant(item, delivery),
-      ),
+      (key === 'captions' && delivery.caption_mode === 'off'
+        ? []
+        : (delivery.timeline?.[key] ?? production.timeline?.[key] ?? [])
+      ).filter((item) => relevant(item, delivery)),
     ]),
   );
 
@@ -51,9 +53,15 @@ export async function fileHash(file) {
   return hash.digest('hex');
 }
 
-async function command(binary, args, { maxBytes = 2_000_000 } = {}) {
+async function command(binary, args, { maxBytes = 2_000_000, input } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(binary, args, {
+      stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    });
+    if (input !== undefined) {
+      child.stdin.on('error', reject);
+      child.stdin.end(input);
+    }
     let stdout = '',
       stderr = '',
       bytes = 0,
@@ -86,6 +94,157 @@ async function command(binary, args, { maxBytes = 2_000_000 } = {}) {
   });
 }
 
+const rectValid = (rect, width, height) =>
+  rect &&
+  ['x', 'y', 'width', 'height'].every((key) => Number.isSafeInteger(rect[key])) &&
+  rect.x >= 0 &&
+  rect.y >= 0 &&
+  rect.width > 0 &&
+  rect.height > 0 &&
+  rect.x + rect.width <= width &&
+  rect.y + rect.height <= height;
+const containsRect = (outer, inner) =>
+  inner.x >= outer.x &&
+  inner.y >= outer.y &&
+  inner.x + inner.width <= outer.x + outer.width &&
+  inner.y + inner.height <= outer.y + outer.height;
+const burnsCaptions = (delivery) => ['burn_in', 'both'].includes(delivery.caption_mode);
+
+// Optional installed Pillow supplies font measurement and bitmap text on FFmpeg builds
+// without drawtext/libfreetype. JSON goes through stdin, never shell/filter text.
+const CAPTION_BITMAP_SCRIPT = String.raw`
+import json, sys, math
+request = json.load(sys.stdin)
+try:
+    import PIL
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    print(json.dumps({"ok": False, "code": "CAPTION_RENDERER_UNAVAILABLE"})); sys.exit(0)
+style = request["style"]
+try:
+    font = ImageFont.truetype(style["font_path"], style["font_size"], index=style["font_index"])
+except Exception as error:
+    print(json.dumps({"ok": False, "code": "CAPTION_FONT_INVALID", "message": str(error)})); sys.exit(0)
+measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+area = style["safe_area"]
+layouts = []
+for index, caption in enumerate(request["captions"]):
+    text = caption["text"].replace("\r\n", "\n").replace("\r", "\n")
+    box = measure.multiline_textbbox((0, 0), text, font=font, spacing=style["line_spacing"], align=style["align"])
+    box = tuple(int(math.floor(value) if index < 2 else math.ceil(value)) for index, value in enumerate(box))
+    padding = style["padding"]
+    width, height = box[2]-box[0]+2*padding, box[3]-box[1]+2*padding
+    if width <= 0 or height <= 0 or width > area["width"] or height > area["height"]:
+        print(json.dumps({"ok": False, "code": "CAPTION_OVERFLOW", "caption_index": index, "measured_width": width, "measured_height": height})); sys.exit(0)
+    x = area["x"] + (0 if style["align"] == "left" else area["width"]-width if style["align"] == "right" else (area["width"]-width)//2)
+    y = area["y"] + (0 if style["vertical_align"] == "top" else area["height"]-height if style["vertical_align"] == "bottom" else (area["height"]-height)//2)
+    result = {"caption_index": index, "box": {"x": x, "y": y, "width": width, "height": height}, "glyph_box": {"x": x+padding, "y": y+padding, "width": box[2]-box[0], "height": box[3]-box[1]}}
+    if request.get("output_paths"):
+        image = Image.new("RGBA", (width, height), style["background_color"])
+        ImageDraw.Draw(image).multiline_text((padding-box[0], padding-box[1]), text, font=font, fill=style["color"], spacing=style["line_spacing"], align=style["align"])
+        image.save(request["output_paths"][index], format="PNG")
+    layouts.append(result)
+print(json.dumps({"ok": True, "layouts": layouts, "pillow_version": PIL.__version__}))
+`;
+
+async function captionBitmapRequest(style, captions, options, outputPaths) {
+  const { stdout } = await command(options.python || 'python3', ['-c', CAPTION_BITMAP_SCRIPT], {
+    input: JSON.stringify({ style, captions, output_paths: outputPaths }),
+  });
+  return JSON.parse(stdout);
+}
+
+async function inspectCaptionLayout(delivery, captions, options) {
+  const issues = [],
+    raw = delivery.caption_style;
+  const add = (code, detail = {}) => issues.push({ code, delivery_id: delivery.id, ...detail });
+  if (!raw || typeof raw !== 'object')
+    return { issues: [{ code: 'CAPTION_STYLE_REQUIRED', delivery_id: delivery.id }] };
+  const allowed = [
+    'font_path',
+    'font_size',
+    'font_index',
+    'line_spacing',
+    'padding',
+    'align',
+    'vertical_align',
+    'color',
+    'background_color',
+    'safe_area',
+  ];
+  if (Object.keys(raw).some((key) => !allowed.includes(key))) add('CAPTION_STYLING_UNSUPPORTED');
+  const style = {
+    ...raw,
+    font_index: raw.font_index ?? 0,
+    line_spacing: raw.line_spacing ?? 4,
+    padding: raw.padding ?? 0,
+    align: raw.align ?? 'center',
+    vertical_align: raw.vertical_align ?? 'bottom',
+    color: raw.color ?? '#ffffffff',
+    background_color: raw.background_color ?? '#00000000',
+  };
+  if (
+    !rectValid(style.safe_area, delivery.width, delivery.height) ||
+    Object.keys(style.safe_area || {}).some((key) => !['x', 'y', 'width', 'height'].includes(key))
+  )
+    add('CAPTION_SAFE_AREA_INVALID');
+  if (
+    !Number.isSafeInteger(style.font_size) ||
+    style.font_size < 1 ||
+    style.font_size > 512 ||
+    !integer(style.font_index) ||
+    !integer(style.line_spacing) ||
+    !integer(style.padding) ||
+    !['left', 'center', 'right'].includes(style.align) ||
+    !['top', 'center', 'bottom'].includes(style.vertical_align) ||
+    !/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(style.color) ||
+    !/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(style.background_color)
+  )
+    add('CAPTION_STYLE_INVALID');
+  if (captions.length > 64) add('CAPTION_COUNT_UNSUPPORTED', { limit: 64 });
+  if (captions.some((c) => typeof c.text !== 'string' || c.text.length > 10000))
+    add('CAPTION_TEXT_INVALID');
+  const ordered = [...captions].sort((a, b) => a.start_ms - b.start_ms);
+  if (
+    burnsCaptions(delivery) &&
+    ordered.some((c, i) => i > 0 && c.start_ms < ordered[i - 1].end_ms)
+  )
+    add('CAPTION_OVERLAP_UNSUPPORTED');
+  let font;
+  try {
+    if (typeof style.font_path !== 'string') throw new Error('An existing font_path is required');
+    style.font_path = path.resolve(options.baseDir || '.', style.font_path);
+    const stat = await fs.stat(style.font_path);
+    if (!stat.isFile() || !stat.size) throw new Error('Font is not a nonempty file');
+    font = { path: style.font_path, sha256: await fileHash(style.font_path) };
+  } catch (error) {
+    add('CAPTION_FONT_UNAVAILABLE', { message: error.message });
+  }
+  if (issues.length) return { issues };
+  try {
+    const measured = await captionBitmapRequest(style, captions, options);
+    if (!measured.ok) {
+      add(measured.code, measured);
+      return { issues };
+    }
+    return {
+      issues,
+      layout: {
+        delivery_id: delivery.id,
+        applied: burnsCaptions(delivery),
+        style,
+        font,
+        pillow_version: measured.pillow_version,
+        safe_area: style.safe_area,
+        captions: measured.layouts,
+      },
+    };
+  } catch (error) {
+    add('CAPTION_RENDERER_UNAVAILABLE', { message: error.message });
+    return { issues };
+  }
+}
+
 export async function probeMedia(file, { ffprobe = 'ffprobe' } = {}) {
   const { stdout } = await command(ffprobe, [
     '-v',
@@ -104,11 +263,17 @@ export async function probeMedia(file, { ffprobe = 'ffprobe' } = {}) {
     .split('/')
     .map(Number);
   const duration = Number(raw.format?.duration ?? video?.duration ?? audio[0]?.duration);
+  const rotation = Number(
+    video?.side_data_list?.find((side) => side.rotation !== undefined)?.rotation ??
+      video?.tags?.rotate ??
+      0,
+  );
   return {
     duration_ms: Number.isFinite(duration) ? Math.round(duration * 1000) : null,
     width: video?.width ?? null,
     height: video?.height ?? null,
     fps: b ? a / b : null,
+    rotation: Number.isFinite(rotation) ? rotation : null,
     video: Boolean(video),
     audio_streams: audio.length,
     codecs: (raw.streams || []).map((s) => ({ type: s.codec_type, codec: s.codec_name })),
@@ -120,6 +285,7 @@ export async function probeMedia(file, { ffprobe = 'ffprobe' } = {}) {
 export async function inspectDelivery(production, takes, options = {}) {
   const issues = [],
     sources = [],
+    caption_layouts = [],
     deliveries = production.brief?.deliveries || [];
   const add = (code, detail = {}) => issues.push({ code, ...detail });
   if (production.schema_version !== 'production.v1') add('SCHEMA_UNSUPPORTED');
@@ -205,10 +371,27 @@ export async function inspectDelivery(production, takes, options = {}) {
         expected: delivery.duration_ms,
         actual: duration,
       });
-    if (delivery.caption_mode && !['off', 'sidecar'].includes(delivery.caption_mode))
+    if (
+      delivery.caption_mode &&
+      !['off', 'sidecar', 'burn_in', 'both'].includes(delivery.caption_mode)
+    )
       add('CAPTION_MODE_UNSUPPORTED', { delivery_id: delivery.id, value: delivery.caption_mode });
     if (delivery.effects?.length || (delivery.transition && delivery.transition !== 'cut'))
       add('EDIT_UNSUPPORTED', { delivery_id: delivery.id });
+    try {
+      evaluateQuality(
+        {
+          black_intervals_ms: [],
+          silence_intervals_ms: [],
+          has_audio: true,
+          mean_volume_db: 0,
+          peak_volume_db: 0,
+        },
+        delivery.qc || {},
+      );
+    } catch (error) {
+      add('QC_POLICY_INVALID', { delivery_id: delivery.id, message: error.message });
+    }
     for (const clip of timeline.clips) {
       const shot = byShot.get(clip.shot_id),
         take = byTake.get(clip.take_id);
@@ -234,8 +417,7 @@ export async function inspectDelivery(production, takes, options = {}) {
       if (
         (clip.transition && clip.transition !== 'cut') ||
         clip.effects?.length ||
-        (clip.speed !== undefined && clip.speed !== 1) ||
-        clip.crop
+        (clip.speed !== undefined && clip.speed !== 1)
       )
         add('EDIT_UNSUPPORTED', { take_id: take.id });
       if (clip.audio !== undefined && typeof clip.audio !== 'boolean')
@@ -246,6 +428,30 @@ export async function inspectDelivery(production, takes, options = {}) {
       )
         add('VOLUME_INVALID', { take_id: take.id });
       const source = await inspectSource(take, take.kind, take.id);
+      if (clip.crop && source?.probe?.rotation !== undefined && source.probe.rotation % 360 !== 0)
+        add('CROP_ORIENTATION_UNSUPPORTED', {
+          take_id: take.id,
+          action:
+            'Normalize or explicitly review source orientation before defining pixel-coordinate crop rectangles.',
+        });
+      if (
+        clip.crop &&
+        (!rectValid(clip.crop, source?.probe?.width, source?.probe?.height) ||
+          Object.keys(clip.crop).some((key) => !['x', 'y', 'width', 'height'].includes(key)))
+      )
+        add('CROP_RECT_INVALID', { take_id: take.id });
+      if (clip.protected_regions !== undefined && !Array.isArray(clip.protected_regions))
+        add('PROTECTED_REGIONS_INVALID', { take_id: take.id });
+      for (const region of Array.isArray(clip.protected_regions) ? clip.protected_regions : []) {
+        if (!rectValid(region, source?.probe?.width, source?.probe?.height))
+          add('PROTECTED_REGION_INVALID', { take_id: take.id, region });
+        else if (
+          clip.crop &&
+          rectValid(clip.crop, source?.probe?.width, source?.probe?.height) &&
+          !containsRect(clip.crop, region)
+        )
+          add('CROP_PROTECTED_REGION_CLIPPED', { take_id: take.id, region });
+      }
       if (
         source?.probe &&
         take.kind === 'video' &&
@@ -296,10 +502,19 @@ export async function inspectDelivery(production, takes, options = {}) {
       if (caption.style || caption.position || caption.effect)
         add('CAPTION_STYLING_UNSUPPORTED', { delivery_id: delivery.id });
     }
+    if (
+      delivery.caption_mode !== 'off' &&
+      timeline.captions.length &&
+      (burnsCaptions(delivery) || delivery.caption_style)
+    ) {
+      const checked = await inspectCaptionLayout(delivery, timeline.captions, options);
+      issues.push(...checked.issues);
+      if (checked.layout) caption_layouts.push(checked.layout);
+    }
   }
   if (options.variantIds?.some((id) => !deliveries.some((d) => d.id === id)))
     add('DELIVERY_UNKNOWN');
-  return { ok: !issues.length, issues, sources };
+  return { ok: !issues.length, issues, sources, caption_layouts };
 }
 
 const stamp = (ms) => {
@@ -447,6 +662,9 @@ export async function renderDeliveries(production, takes, options = {}) {
     (d) => !options.variantIds || options.variantIds.includes(d.id),
   )) {
     const timeline = selectedTimeline(production, delivery);
+    const captionLayout = inspection.caption_layouts.find(
+      (layout) => layout.delivery_id === delivery.id,
+    );
     const sourceIds = [
       ...new Set([
         ...timeline.clips.map((c) => c.take_id),
@@ -462,9 +680,10 @@ export async function renderDeliveries(production, takes, options = {}) {
       delivery,
       timeline,
       inputs,
+      caption_layout: captionLayout || null,
       fps: production.timeline.fps,
       phase,
-      renderer: 'ffmpeg-cut.v1',
+      renderer: 'ffmpeg-cut.v3',
     });
     const stem = `${safe(production.project_id)}-${safe(delivery.id)}-${fingerprint.slice(0, 20)}`;
     const output = path.join(outputDir, `${stem}.mp4`),
@@ -484,6 +703,10 @@ export async function renderDeliveries(production, takes, options = {}) {
       adopted_qa: true,
       stale: false,
       creative_delivery_review: 'pending',
+      ...(captionLayout ? { caption_layout: clone(captionLayout) } : {}),
+      framing_review: timeline.clips.some((c) => c.crop)
+        ? 'pending_visual_review'
+        : 'source_fit_with_padding',
     };
     async function verifySourcesUnchanged() {
       for (const id of sourceIds) {
@@ -491,6 +714,10 @@ export async function renderDeliveries(production, takes, options = {}) {
         if ((await fileHash(source.path)) !== source.sha256)
           throw new DeliveryGateError([{ code: 'SOURCE_CHANGED_DURING_RENDER', source_id: id }]);
       }
+      if (captionLayout && (await fileHash(captionLayout.font.path)) !== captionLayout.font.sha256)
+        throw new DeliveryGateError([
+          { code: 'CAPTION_FONT_CHANGED_DURING_RENDER', delivery_id: delivery.id },
+        ]);
     }
     if (options.dryRun) {
       manifest.deliveries.push(record);
@@ -564,7 +791,7 @@ export async function renderDeliveries(production, takes, options = {}) {
           '-map',
           nativeAudio ? '0:a:0' : '1:a:0',
           '-vf',
-          `scale=${delivery.width}:${delivery.height}:force_original_aspect_ratio=decrease,pad=${delivery.width}:${delivery.height}:(ow-iw)/2:(oh-ih)/2,fps=${production.timeline.fps},setsar=1`,
+          `${clip.crop ? `crop=${clip.crop.width}:${clip.crop.height}:${clip.crop.x}:${clip.crop.y}:exact=1,` : ''}scale=${delivery.width}:${delivery.height}:force_original_aspect_ratio=decrease,pad=${delivery.width}:${delivery.height}:(ow-iw)/2:(oh-ih)/2,fps=${production.timeline.fps},setsar=1`,
           '-af',
           `apad,volume=${nativeAudio ? (clip.volume ?? 1) : 0}`,
           '-c:v',
@@ -611,21 +838,58 @@ export async function renderDeliveries(production, takes, options = {}) {
         ];
       for (const track of timeline.audio)
         args.push('-ss', secs(track.source_in_ms), '-i', bySource.get(track.asset_id).path);
+      const filters = [];
       if (timeline.audio.length) {
-        const filters = timeline.audio.map(
-          (track, i) =>
-            `[${i + 1}:a]atrim=duration=${secs(track.duration_ms)},asetpts=PTS-STARTPTS,volume=${track.volume ?? 1},adelay=${track.start_ms}:all=1[a${i}]`,
+        filters.push(
+          ...timeline.audio.map(
+            (track, i) =>
+              `[${i + 1}:a]atrim=duration=${secs(track.duration_ms)},asetpts=PTS-STARTPTS,volume=${track.volume ?? 1},adelay=${track.start_ms}:all=1[a${i}]`,
+          ),
         );
         filters.push(
           `[0:a]${timeline.audio.map((_, i) => `[a${i}]`).join('')}amix=inputs=${timeline.audio.length + 1}:normalize=0:duration=first[mix]`,
         );
-        args.push('-filter_complex', filters.join(';'), '-map', '0:v:0', '-map', '[mix]');
-      } else args.push('-map', '0:v:0', '-map', '0:a:0');
+      }
+      if (burnsCaptions(delivery) && captionLayout) {
+        const bitmapPaths = timeline.captions.map((_, i) => path.join(work, `caption-${i}.png`));
+        const drawn = await captionBitmapRequest(
+          captionLayout.style,
+          timeline.captions,
+          options,
+          bitmapPaths,
+        );
+        if (
+          !drawn.ok ||
+          digest(drawn.layouts) !== digest(captionLayout.captions) ||
+          drawn.pillow_version !== captionLayout.pillow_version
+        )
+          throw new DeliveryGateError([
+            { code: 'CAPTION_LAYOUT_CHANGED_DURING_RENDER', delivery_id: delivery.id },
+          ]);
+        for (let i = 0; i < bitmapPaths.length; i++) {
+          args.push('-i', bitmapPaths[i]);
+          const caption = timeline.captions[i],
+            box = captionLayout.captions[i].box;
+          filters.push(
+            `[${i ? `cv${i - 1}` : '0:v'}][${timeline.audio.length + i + 1}:v]overlay=x=${box.x}:y=${box.y}:enable='gte(t,${secs(caption.start_ms)})*lt(t,${secs(caption.end_ms)})':eof_action=repeat[cv${i}]`,
+          );
+        }
+      }
+      if (filters.length) args.push('-filter_complex', filters.join(';'));
+      args.push(
+        '-map',
+        burnsCaptions(delivery) && captionLayout ? `[cv${timeline.captions.length - 1}]` : '0:v:0',
+        '-map',
+        timeline.audio.length ? '[mix]' : '0:a:0',
+      );
       args.push(
         '-t',
         secs(delivery.duration_ms),
         '-c:v',
-        'copy',
+        burnsCaptions(delivery) && captionLayout ? 'libx264' : 'copy',
+        ...(burnsCaptions(delivery) && captionLayout
+          ? ['-preset', 'veryfast', '-crf', phase === 'rough' ? '28' : '20', '-pix_fmt', 'yuv420p']
+          : []),
         '-c:a',
         'aac',
         '-b:a',
@@ -649,11 +913,29 @@ export async function renderDeliveries(production, takes, options = {}) {
           { code: 'OUTPUT_TECHNICAL_QC_FAILED', delivery_id: delivery.id, probe: media },
         ]);
       await command(ffmpeg, ['-v', 'error', '-nostdin', '-i', tempOutput, '-f', 'null', '-']);
+      const measurements = await inspectMediaQuality(tempOutput, {
+        ffmpeg,
+        hasAudio: media.audio_streams > 0,
+      });
+      const qualityIssues = evaluateQuality(measurements, delivery.qc || {});
+      if (qualityIssues.length)
+        throw new DeliveryGateError(
+          qualityIssues.map((issue) => ({ ...issue, delivery_id: delivery.id, measurements })),
+        );
       await verifySourcesUnchanged();
       record.sha256 = await fileHash(tempOutput);
       record.probe = media;
       record.technical_qc = { probe: 'pass', decode: 'pass' };
-      if (delivery.caption_mode !== 'off' && timeline.captions.length) {
+      record.measurements = measurements;
+      record.quality_review = Object.keys(delivery.qc || {}).length
+        ? 'explicit_policy_pass_pending_creative_review'
+        : 'measurements_pending_review';
+      if (captionLayout)
+        record.technical_qc.caption_safe_area = captionLayout.applied
+          ? 'geometry_pass_applied'
+          : 'geometry_pass_not_applied';
+      if (timeline.clips.some((c) => c.crop)) record.technical_qc.crop_bounds = 'pass';
+      if (!['off', 'burn_in'].includes(delivery.caption_mode) && timeline.captions.length) {
         const captionPath = path.join(outputDir, `${stem}.srt`);
         await fs.writeFile(captionPath, captionsToSrt(timeline.captions), { flag: 'wx' });
         record.captions = { path: captionPath, sha256: await fileHash(captionPath), format: 'srt' };

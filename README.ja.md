@@ -30,7 +30,7 @@ Character Pipelineは人物・体格・衣装・声・世界・小道具の採�
 node --test production-core/test/*.test.mjs
 ```
 
-同梱fixtureは計画専用です。生成前に採用参照、実際のcontext、capability snapshot、価格根拠が必要です。Canvas素材のダウンロードは別途transport設定が必要で、標準CLIには未設定です。
+同梱fixtureは計画専用です。生成前に採用参照、実際のcontext、capability snapshot、価格根拠が必要です。Canvasの採用素材は、選択historyを取得前後に確認し、容量制限付きHTTPSで保存できます。
 
 人物登録、承認後の実行、再開、仕上げ、移行、代表3例は[利用ガイド](references/production-v1.md)、正確な項目は[データ契約](production-core/docs/CONTRACT.md)を参照します。同じ作品を両入口で扱う時は明示的に同じ `--db` パスを指定します。
 
@@ -38,7 +38,7 @@ node --test production-core/test/*.test.mjs
 
 採用版は変更せず新しい版を作ります。送信前に台帳と費用予約を保存し、既知IDを再開します。送信結果が不明なら照合待ちにして自動再投入しません。明示OFFは保持します。Canvasでの人の変更は差分として扱い、黙って巻き戻したりCreateで二重送信したりしません。
 
-生成成功と作品への採用は別です。実ファイル、技術・人物・継続性・音・作品の検品を通して納品します。mock/fixtureの合格は画質・声の再現・口パク・正確な料金・全Canvas機能の実測ではありません。TTSの重畳はナレーションです。既存FFmpeg/ffprobeでcut・trim・fit/pad・音声mix・SRT別添を扱い、crop・演出効果・字幕焼込・複雑なtransitionは未対応として止めます。技術検査後も完成版の創作採用は別途必要です。実生成の創作品質は、別の上限付き試験で確認します。
+生成成功と作品への採用は別です。実ファイル、技術・人物・継続性・音・作品の検品を通して納品します。mock/fixtureの合格は画質・声の再現・口パク・正確な料金・全Canvas機能の実測ではありません。TTSの重畳はナレーションです。既存FFmpeg/ffprobeでcut・trim・明示cropと保護領域・fit/pad・音声mix・SRT別添を扱います。既存Python/Pillowと指定フォントがあれば安全領域内の基本字幕焼込も可能です。黒画面・無音区間・音量は測定し、指定された閾値だけで拒否します。複雑な演出効果・transitionは未対応として止めます。技術検査後も完成版の創作採用は別途必要です。実生成の創作品質は、別の上限付き試験で確認します。
 
 ## 既存作品の移行と復帰
 

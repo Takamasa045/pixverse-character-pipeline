@@ -15,7 +15,8 @@ export function planProduction(production, { resolveIntent } = {}) {
       continue;
     }
     const g = shot.generation,
-      parameters = structuredClone(g.parameters ?? {});
+      parameters = structuredClone(g.parameters ?? {}),
+      snapshot = g.preset_snapshot ?? g.capability_snapshot ?? null;
     if (
       shot.audio?.strict_dialogue &&
       shot.audio?.visible_mouth &&
@@ -77,21 +78,25 @@ export function planProduction(production, { resolveIntent } = {}) {
       mode: g.mode,
       model: g.model,
       parameters:
-        g.mode === 'voice'
-          ? { ...parameters, text: parameters.text ?? shot.prompt ?? shot.purpose }
-          : { ...parameters, prompt: parameters.prompt ?? shot.prompt ?? shot.purpose },
+        g.backend === 'preset'
+          ? parameters
+          : g.mode === 'voice'
+            ? { ...parameters, text: parameters.text ?? shot.prompt ?? shot.purpose }
+            : { ...parameters, prompt: parameters.prompt ?? shot.prompt ?? shot.purpose },
       inputs,
       context: p.context,
       entity_revisions: shot.entity_revisions ?? [],
-      capability_hash: hash(g.capability_snapshot ?? null),
+      capability_hash: hash(snapshot),
+      ...(g.backend === 'preset' ? { preset_id: g.preset_id, output_kind: g.output_kind } : {}),
       ...(g.canvas ? { canvas: g.canvas } : {}),
     };
-    if (resolveIntent && g.capability_snapshot) {
+    if (resolveIntent && snapshot) {
       try {
         const resolved = resolveIntent({
           ...request,
           id: 'planning',
-          capability_snapshot: g.capability_snapshot,
+          capability_snapshot: snapshot,
+          ...(g.backend === 'preset' ? { preset_snapshot: snapshot } : {}),
         });
         request = { ...request, parameters: resolved.parameters ?? request.parameters };
       } catch (e) {
@@ -123,7 +128,8 @@ export function planProduction(production, { resolveIntent } = {}) {
       id: hash(request),
       upper_credits: g.upper_credits ?? null,
       price_evidence: g.price_evidence ?? null,
-      capability_snapshot: g.capability_snapshot ?? null,
+      capability_snapshot: snapshot,
+      ...(g.backend === 'preset' ? { preset_snapshot: snapshot } : {}),
     };
     if (intent.attempt > p.execution_policy.max_attempts)
       blocked.push({ shot_id: shot.shot_id, reason: 'attempt limit exceeded' });
@@ -190,6 +196,12 @@ export function planProduction(production, { resolveIntent } = {}) {
 export function impactAnalysis(production, changed) {
   const set = new Set(changed),
     affected = new Set(changed);
+  for (const s of production.shots)
+    if (
+      (s.references ?? []).some((r) => set.has(r.asset)) ||
+      (s.entity_revisions ?? []).some((e) => set.has(e.id))
+    )
+      affected.add(s.shot_id);
   let again = true;
   while (again) {
     again = false;
@@ -199,12 +211,6 @@ export function impactAnalysis(production, changed) {
         again = true;
       }
   }
-  for (const s of production.shots)
-    if (
-      (s.references ?? []).some((r) => set.has(r.asset)) ||
-      (s.entity_revisions ?? []).some((e) => set.has(e.id))
-    )
-      affected.add(s.shot_id);
   const shots = production.shots.filter((s) => affected.has(s.shot_id)).map((s) => s.shot_id);
   return {
     changed: [...set],

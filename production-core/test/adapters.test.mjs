@@ -511,30 +511,35 @@ test('Canvas confirmation cannot be bypassed and metadata nodes cannot dispatch'
   applied.executable_node_ids = ['metadata'];
   await assert.rejects(() => dispatchCanvasPatch(intent, applied), /not in apply.diff/);
 });
-test('Canvas downloader explicitly reports unsupported transport and preserves node', async () => {
-  const mocked = mockRun([
-    {
-      exit_code: 0,
-      raw: {
-        Resp: {
-          node: {
-            node_id: 'video_1',
-            derived_state: 'SUCCEEDED',
-            history_id: '1001',
-            file_path: 'https://trusted',
-          },
+test('Canvas default transport rejects unresolved relative media without a fetch', async () => {
+  const response = {
+    exit_code: 0,
+    raw: {
+      Resp: {
+        node: {
+          node_id: 'video_1',
+          derived_state: 'SUCCEEDED',
+          history_id: '1001',
+          file_path: 'upload/relative.mp4',
         },
       },
     },
-  ]);
-  const result = await createCanvasAdapter({ run: mocked.run }).download(
-    canvasIntent(),
-    'video_1',
-    '/tmp/out',
-  );
-  assert.equal(result.exit_code, 6);
-  assert.match(result.error, /not configured/);
-  assert.equal(mocked.calls.length, 1);
+  };
+  const mocked = mockRun([response, response]);
+  let calls = 0;
+  const result = await createCanvasAdapter({
+    run: mocked.run,
+    downloadOptions: {
+      fetchImpl: async () => {
+        calls++;
+        throw new Error('must not fetch');
+      },
+    },
+  }).download(canvasIntent(), 'video_1', '/tmp/out');
+  assert.equal(result.exit_code, 1);
+  assert.match(result.error, /absolute HTTPS/);
+  assert.equal(calls, 0);
+  assert.equal(mocked.calls.length, 2);
 });
 test('Canvas dry-run requires explicit successful backend envelope', async () => {
   const mocked = mockRun([{ exit_code: 0, raw: { valid: true } }]);
@@ -566,23 +571,22 @@ test('Canvas version selection handles already-current no-op then refreshes grap
   assert(!mocked.calls[0].args.includes('--edit-version'));
   assert(mocked.calls.every((c) => !c.args.includes('dispatch')));
 });
-test('Canvas existing complete media downloads only through configured known-node transport', async () => {
-  const mocked = mockRun([
-    {
-      exit_code: 0,
-      raw: {
-        Resp: {
-          node: {
-            node_id: 'video_1',
-            derived_state: 'SUCCEEDED',
-            history_id: '1001',
-            file_path: 'https://trusted',
-          },
+test('Canvas existing complete media downloads only through its selected history with a recheck', async () => {
+  const response = {
+    exit_code: 0,
+    raw: {
+      Resp: {
+        node: {
+          node_id: 'video_1',
+          derived_state: 'SUCCEEDED',
+          history_id: '1001',
+          file_path: 'https://trusted',
         },
       },
     },
-  ]);
-  const seen = [];
+  };
+  const mocked = mockRun([response, response, response]),
+    seen = [];
   const adapter = createCanvasAdapter({
     run: mocked.run,
     downloadMedia: async (request) => {
@@ -593,5 +597,5 @@ test('Canvas existing complete media downloads only through configured known-nod
   const result = await adapter.download(canvasIntent(), 'video_1', '/tmp/fresh');
   assert.equal(result.results[0].path, '/tmp/canvas-known.mp4');
   assert.equal(seen[0].file_path, 'https://trusted');
-  assert.equal(mocked.calls.length, 1);
+  assert.equal(mocked.calls.length, 3);
 });

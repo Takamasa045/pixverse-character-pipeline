@@ -241,12 +241,114 @@ function addDelivery(production, { id, aspect, locale = 'und', duration, width, 
   });
 }
 
+// The retired spokesperson entry normalizes scripts into generated clip requirements.
+// Defaults below mirror its local reader and are explicitly recorded, never generated.
+function normalizeSpokesperson(input, report) {
+  if (!input.scripts || typeof input.scripts !== 'object' || Array.isArray(input.scripts))
+    throw Object.assign(new Error('Legacy spokesperson scripts must be a locale map'), {
+      code: 'LEGACY_SCRIPTS_INVALID',
+    });
+  const output = input.output || {},
+    announcement = input.announcement || {},
+    locales = {};
+  const defaults = (field, value) => {
+    issue(report, 'LEGACY_DEFAULT_APPLIED', {
+      field,
+      value,
+      source: 'retired Character config reader',
+    });
+    return value;
+  };
+  const duration =
+    typeof output.duration === 'number' && Number.isFinite(output.duration)
+      ? output.duration
+      : defaults('output.duration', 5);
+  const aspects =
+    Array.isArray(output.aspect_ratios) && output.aspect_ratios.length
+      ? output.aspect_ratios
+      : defaults('output.aspect_ratios', ['16:9', '9:16']);
+  for (const [locale, script] of Object.entries(input.scripts)) {
+    if (!script || typeof script !== 'object' || Array.isArray(script)) {
+      issue(report, 'LEGACY_SCRIPT_INVALID', { locale });
+      continue;
+    }
+    const mode =
+      typeof script.audio_mode === 'string'
+        ? script.audio_mode
+        : defaults(`scripts.${locale}.audio_mode`, 'tts');
+    if (!['tts', 'file'].includes(mode))
+      issue(report, 'LEGACY_AUDIO_MODE_REVIEW_REQUIRED', { locale, value: mode });
+    const text = typeof script.text === 'string' ? script.text : undefined;
+    const voiceId =
+      mode === 'tts' && typeof script.voice_id === 'string' && script.voice_id.trim()
+        ? script.voice_id
+        : null;
+    const audioFile =
+      mode === 'file' && typeof script.audio_file === 'string' && script.audio_file.trim()
+        ? script.audio_file
+        : null;
+    if (script.tts_speaker !== undefined)
+      issue(report, 'LEGACY_NUMERIC_TTS_SPEAKER_UNMAPPED', {
+        locale,
+        original: copy(script.tts_speaker),
+        voice_id: voiceId,
+        action:
+          'Select or verify an actual voice_id; a legacy numeric speaker index is not a current voice identifier.',
+      });
+    if (mode === 'file' && !audioFile) issue(report, 'LEGACY_AUDIO_FILE_MISSING', { locale });
+    if (mode === 'tts' && !text) issue(report, 'LEGACY_SCRIPT_TEXT_MISSING', { locale });
+    locales[locale] = {
+      clips: [
+        {
+          id: 'primary',
+          source: 'generated',
+          durationSeconds: duration,
+          text,
+          audioFile,
+          voiceId,
+          hasAudio: true,
+          overlayStyle: 'none',
+          overlayText: '',
+        },
+      ],
+    };
+  }
+  const ambient =
+    typeof output.ambient_sound === 'string' ? output.ambient_sound.trim().toLowerCase() : '';
+  const generateAudio =
+    typeof output.generate_audio === 'boolean'
+      ? output.generate_audio
+      : Boolean(ambient && !['none', 'null', 'false'].includes(ambient));
+  if (ambient && !['none', 'null', 'false'].includes(ambient))
+    issue(report, 'LEGACY_AMBIENT_HINT_REVIEW_REQUIRED', {
+      original: output.ambient_sound,
+      generate_audio: generateAudio,
+    });
+  if (input.prompt?.per_ratio)
+    issue(report, 'LEGACY_RATIO_PROMPTS_REQUIRE_PER_DELIVERY_PLAN', {
+      original: copy(input.prompt.per_ratio),
+    });
+  report.source_variant = 'spokesperson';
+  return {
+    project: { title: announcement.topic || 'Untitled Project', date: announcement.date ?? null },
+    speaker: copy(input.speaker || {}),
+    locales,
+    render: { aspectRatios: aspects, fps: defaults('render.fps', 30), outputDir: output.dest },
+    generation: {
+      model: output.model,
+      referenceModel: output.reference_model,
+      quality: output.quality,
+      upscale: output.upscale,
+      generateAudio,
+      prompt: { base: input.prompt?.base, perRatio: input.prompt?.per_ratio },
+    },
+  };
+}
+
 async function characterImport(input, production, takes, report, options) {
   if (!input.locales)
     throw Object.assign(
-      new Error(
-        'Character import requires project.locales; legacy spokesperson scripts need explicit conversion to project format first.',
-      ),
+      new Error('Character import requires project.locales or legacy spokesperson scripts.'),
       { code: 'LEGACY_CHARACTER_UNSUPPORTED' },
     );
   const images = input.speaker?.images || [];
@@ -661,7 +763,7 @@ export async function importLegacy(input, options = {}) {
     throw Object.assign(new Error('Expected a legacy input object'), { code: 'LEGACY_INVALID' });
   const format =
     options.format ||
-    (input.locales
+    (input.locales || input.scripts
       ? 'character'
       : input.scenes || input.cuts || input.variants
         ? 'manifest'
@@ -677,9 +779,19 @@ export async function importLegacy(input, options = {}) {
   };
   const production = createProduction(input, options, report),
     takes = [];
-  if (format === 'character' || format === 'character-project')
-    await characterImport(input, production, takes, report, options);
-  else if (
+  if (format === 'character' || format === 'character-project') {
+    const characterInput =
+      !input.locales && input.scripts ? normalizeSpokesperson(input, report) : input;
+    if (report.source_variant === 'spokesperson') {
+      production.brief.original = characterInput.project.title;
+      production.timeline.fps = characterInput.render.fps;
+      production.migration.normalization = {
+        kind: 'legacy-spokesperson',
+        project_date: characterInput.project.date,
+      };
+    }
+    await characterImport(characterInput, production, takes, report, options);
+  } else if (
     format === 'shotpack' ||
     format === 'shotpack-project' ||
     format === 'shotpack-storyboard'
@@ -1051,7 +1163,10 @@ export async function exportLegacy(production, takes, options = {}) {
     throw Object.assign(new Error(`Unsupported export format: ${format}`), {
       code: 'LEGACY_EXPORT_UNSUPPORTED',
     });
-  const date = options.date || production.migration?.original?.project?.date;
+  const date =
+    options.date ||
+    production.migration?.original?.project?.date ||
+    production.migration?.normalization?.project_date;
   if (['character-project', 'shotpack-project'].includes(format) && !date)
     issues.push({
       code: 'EXPORT_PROJECT_DATE_REQUIRED',

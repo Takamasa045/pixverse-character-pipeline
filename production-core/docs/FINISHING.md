@@ -32,9 +32,57 @@ Times are integer milliseconds. A delivery can override `timeline.clips`, `timel
 }
 ```
 
-Supported operations are hard cuts, source trims, still-image holds, proportional fit with black padding, explicit output dimensions/fps, native source audio opt-in, timed audio tracks with gain, and UTF-8 SRT sidecars. Native audio is muted unless the clip explicitly sets `audio: true`; `false` stays false. A missing native audio stream blocks an explicitly audible clip. Soundtrack gain is linear, 0–4; mixing does not promise a loudness target or prevent clipping. The requested video dimensions must be even and match the declared aspect ratio. Clip lengths must sum to the requested duration for each selected delivery. Images require `source_in_ms: 0`.
+Supported operations are hard cuts, source trims, still-image holds, explicit rectangular crops, proportional fit with black padding, explicit output dimensions/fps, native source audio opt-in, timed audio tracks with gain, UTF-8 SRT sidecars, and optional basic subtitle burn-in with a supplied font and safe area. Native audio is muted unless the clip explicitly sets `audio: true`; `false` stays false. A missing native audio stream blocks an explicitly audible clip. Soundtrack gain is linear, 0–4; mixing does not promise a loudness target or prevent clipping. The requested video dimensions must be even and match the declared aspect ratio. Clip lengths must sum to the requested duration for each selected delivery. Images require `source_in_ms: 0`.
 
-Dissolves, speed changes, crops, effects, audio loops/fades, caption styling, positioned captions and subtitle burn-in are blocked with specific issue codes. They are not silently flattened. A sidecar does not establish on-screen subtitle safe areas or typography; use another verified finishing adapter when those are required. Arbitrary NLE project interchange, motion graphics and strict speech synchronization are outside this adapter.
+Dissolves, speed changes, effects, audio loops/fades, arbitrary per-caption styling/position/animation, and overlapping burn-in layers are blocked with specific issue codes. They are not silently flattened. Arbitrary NLE project interchange, motion graphics and strict speech synchronization are outside this adapter.
+
+## Basic safe-area subtitles
+
+Set a delivery's `caption_mode` explicitly: `off`, `sidecar` (the default), `burn_in`, or `both`. Burn-in requires an existing font path and an explicit safe area in output pixels. No font is downloaded or installed. An optional already installed Python 3 + Pillow runtime measures and rasterizes text; FFmpeg overlays those small transparent bitmaps. This also works when FFmpeg was built without drawtext/libfreetype. Missing Python/Pillow or an unsupported font produces a capability blocker before encoding. The normal cut/audio/sidecar path does not require Python or Pillow. The library can select an existing runtime with `options.python`.
+
+```json
+{
+  "id": "ja-portrait",
+  "locale": "ja",
+  "aspect": "9:16",
+  "width": 1080,
+  "height": 1920,
+  "duration_ms": 4000,
+  "caption_mode": "both",
+  "caption_style": {
+    "font_path": "./fonts/supplied-font.ttf",
+    "font_size": 48,
+    "safe_area": {"x": 80, "y": 1380, "width": 920, "height": 300},
+    "padding": 16,
+    "line_spacing": 10,
+    "align": "center",
+    "vertical_align": "bottom",
+    "color": "#ffffffff",
+    "background_color": "#000000cc"
+  }
+}
+```
+
+Safe areas are project requirements, not a claim about every social application's controls. Rectangles must lie inside the output frame. The renderer measures actual multiline glyph bounds, includes padding, and rejects overflow instead of silently shrinking, clipping, wrapping or moving text. Use explicit newlines or revise font size/area after a blocker. Font size is an integer from 1–512; a collection can choose `font_index` (default 0). Supported horizontal alignment is `left`/`center`/`right`, vertical alignment is `top`/`center`/`bottom`. Colors are explicit 6/8-digit hex. Defaults are white text, transparent background, zero padding, 4-pixel line spacing, centered and bottom-aligned. Basic burn-in supports at most 64 nonoverlapping captions per delivery; complex layering needs another adapter. Each caption uses the half-open range `[start_ms,end_ms)`.
+
+The delivery record includes `caption_layout` with the exact font hash, Pillow version, safe area and measured glyph/background rectangles. Those details participate in the fingerprint. A font changed at the same path invalidates the output, and a change during encoding blocks certification. For burn-in, `technical_qc.caption_safe_area: 'geometry_pass_applied'` confirms that the measured text was overlaid in the stated area. A sidecar with `caption_style` can be measured and accompanied by the layout metadata, but reports `geometry_pass_not_applied`; an SRT alone cannot enforce positioning in another player. `off` suppresses both output and font processing. Font coverage, shaping, contrast, reading speed and actual legibility still require the final visual review; a measured box is not a language-quality assessment.
+
+## Explicit vertical/horizontal reframing
+
+Add `crop: {x,y,width,height}` to an individual clip using source pixels. The crop must lie inside the probed source dimensions; FFmpeg applies it before proportional fit/padding. Use a delivery-specific `timeline.clips` for a portrait reframe so the horizontal timeline remains unchanged. Coordinates for rotated metadata are ambiguous; sources with nonzero rotation must be normalized/reviewed before this crop path is accepted. The adapter never guesses a subject position or silently chooses a crop.
+
+Optional `protected_regions` identify required source regions such as a face, hands or logo. Every declared rectangle must lie in the source and remain fully inside the crop. If the requested crop removes one, `CROP_PROTECTED_REGION_CLIPPED` blocks delivery rather than regenerating or automatically recentering a shot.
+
+```json
+{
+  "shot_id":"arrival", "take_id":"take-2", "source_in_ms":500, "duration_ms":1800,
+  "audio":false,
+  "crop":{"x":660,"y":0,"width":608,"height":1080},
+  "protected_regions":[{"x":720,"y":100,"width":400,"height":800,"label":"Required person"}]
+}
+```
+
+Crop bounds and declared region containment are technical checks. `framing_review: 'pending_visual_review'` retains the human gate for composition and any important elements the user did not annotate. The source file, adopted take and other variants are preserved. Camera paths, animated reframing, multi-layer composites and arbitrary transforms remain optional external-adapter work.
 
 ## Acceptance and file gates
 
@@ -43,6 +91,14 @@ Every visual take must belong to the project and shot, have `status: 'accepted'`
 `inspectDelivery(production, takes, options)` returns `{ok, issues, sources}`. `renderDeliveries(...)` throws `DeliveryGateError` with `code: 'DELIVERY_BLOCKED'` and structured issues when gates fail. Sources are rehashed after rendering so a file changed during a render cannot be certified by an old snapshot.
 
 Each render produces a content-addressed MP4, a per-delivery JSON record, an optional SRT, and a `delivery.v1` manifest. The manifest records source hashes and adopted QA, the exact timeline, delivery dimensions/language/fps/duration, FFprobe results, a full decode check, output hashes and cost evidence. `generation_jobs: 0` means this finishing operation submitted no jobs. An absent cost report remains `actual_credits: null`; it does not turn the cost of previously generated media into zero.
+
+After decoding, the local quality analyzer records `measurements.black_intervals_ms`, `silence_intervals_ms`, `mean_volume_db` and `peak_volume_db`. Detector settings are included. Digital silence is the measured string `'-inf'`; `null` means unavailable. Mean/peak dB measurements are not integrated perceptual LUFS or a promise of audio quality. Without `delivery.qc`, observations are left for review and do not reject intentional black or silent scenes. Explicit policy keys are `max_black_interval_ms`, `max_silence_interval_ms`, `min_mean_volume_db`, `max_peak_volume_db`, and boolean `expected_audio`. An unsupported policy key blocks preflight rather than being ignored.
+
+```json
+{"qc":{"expected_audio":true,"max_silence_interval_ms":1200,"max_black_interval_ms":250,"min_mean_volume_db":-30,"max_peak_volume_db":-1}}
+```
+
+Only supplied limits block output, before publication of the completed MP4/manifest. `expected_audio: false` permits intended silence and disables silence/loudness limits; an explicit black-duration limit still applies. `expected_audio: true` checks for an audio stream; require a silence/loudness limit as well when audible content is required. `quality_review` distinguishes observations awaiting review from explicit policy success. These checks do not certify the artistic meaning of black frames or a natural voice, and never request replacement generation.
 
 `status: 'completed'` means the requested local encoding and technical checks completed. `acceptance: 'pending_creative_delivery_review'` and each output's `creative_delivery_review: 'pending'` deliberately keep the final human viewing gate open. The adapter does not certify identity, acting, pacing, black-frame intent, audio quality, loudness or subtitle appearance from a probe. Watch the assembled output at normal speed before publishing.
 
@@ -65,4 +121,4 @@ node production-core/src/cli.mjs issue production.json --start-ms 3500 --end-ms 
 node --test production-core/test/finish.test.mjs
 ```
 
-The tests create tiny synthetic local media and cover real FFmpeg trims, still holds, audio mixing, explicit audio OFF checked in decoded PCM, SRT, dimensions/fps/duration, full decode, output hashes, language-specific subtitle revisions, reuse, time-range mapping, adoption/hash/stale gates, interrupted locks, source changes during rendering, and failed output/tool writes. They do not claim real PixVerse generation quality or a tested cloud editing route.
+The tests create tiny synthetic local media and cover real FFmpeg trims, still holds, audio mixing, explicit audio OFF checked in decoded PCM, SRT, dimensions/fps/duration, full decode, output hashes, language-specific subtitle revisions, reuse, time-range mapping, adoption/hash/stale gates, interrupted locks, source changes during rendering, and failed output/tool writes. With an existing font/Pillow runtime they also render Japanese/English burn-in over a narration mix, extract decoded pixels before/during/after the caption, and verify no visible text lies outside the safe area. A two-color image proves portrait crop selection while the horizontal output and source remain unchanged; losing an annotated subject blocks delivery. Quality tests verify measured silence, intentionally silent delivery, and explicit black/silence/loudness limits blocking before publication. Optional bitmap tests explicitly skip on hosts without a suitable installed runtime/font; capability-block tests cover the unavailable runtime path. These are local rendering/contract tests, not claims of real PixVerse generation quality.

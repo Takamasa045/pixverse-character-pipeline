@@ -133,12 +133,40 @@ technical, creative, continuity and audio review in the shared core.
 as an already-current successful no-op. It then reads the graph to get the new
 edit version. It does not redispatch or invalidate downstream nodes itself.
 
-Canvas has no documented generic media-ID download command. Without an injected
-`downloadMedia`, download returns an explicit unsupported-transport result,
-keeping the existing node. With it, the adapter reads the current known node and
-passes only its newly completed trusted `file_path`, destination and context.
-The injected transport must publish without overwrite and never generate media.
-Relative Graph media paths are not converted into invented HTTP endpoints.
+Canvas's default download transport uses an absolute HTTPS media URL returned by
+the current known node, through Node `fetch`; it never interprets a history/node
+ID as a Create media ID. `downloadCanvasSelection` also serves human selections
+imported from Canvas without a generation intent:
+
+```js
+import {downloadCanvasSelection} from './src/canvas.mjs';
+const result = await downloadCanvasSelection({
+  project_id,node_id,history_id,context,destination:outputDirectory,kind:'video',
+}, {run,downloadOptions:{fetchImpl:fixtureFetch}});
+```
+
+The helper reads the selected history before and after transferring its media.
+When `node get` lacks a derived state, it checks the documented graph status. A
+history or URL change blocks completion and retains downloaded bytes for review.
+Results include path, SHA256, bytes and the exact history ID. IDs remain strings.
+This verifies the downloaded selection, not which generation request created it.
+
+`src/media-download.mjs` bounds transfers to 256 MiB and 120 seconds by default.
+`downloadOptions` can set `maxBytes`, `timeoutMs`, `maxRedirects`, `reserveBytes`,
+`fetchImpl` and test filesystem operations. HTTP, embedded URL credentials,
+insecure redirects, invalid/oversized Content-Length, excess streamed bytes,
+truncation, empty content and non-media responses are rejected. No OAuth token
+or authentication headers are sent to the URL. The destination is a directory;
+safe generated filenames use a hash of project/node/history/context. Atomic
+hardlink publication refuses files, directories and symlinks already occupying
+that filename. Failure cleans only this operation's new staging files. Existing
+user files remain intact. Storage exhaustion and unsupported hardlinks report an
+error without generating media. Relative Graph media paths are not converted
+into invented HTTP endpoints; if no HTTPS `url` accompanies them, a fresh
+documented node/version lookup is required.
+
+`downloadMedia` remains injectable for other verified finishing transports. It
+must follow the same no-overwrite/no-generation contract.
 
 ### Human editing and synchronization
 
@@ -175,7 +203,7 @@ layout.
 
 ## Evidence, tests and limits
 
-Run `node --test production-core/test/adapters.test.mjs` from the repository.
+Run `node --test production-core/test/adapters.test.mjs production-core/test/media-download.test.mjs production-core/test/presets.test.mjs` from the repository.
 Fixtures are capability responses, not evidence of media quality. Their sources
 and versions are recorded in `test/fixtures/ADAPTER-SOURCES.json`. Tests use an
 injected runner and perform no live mutations or downloads.
@@ -187,11 +215,95 @@ and [CLI changelog](https://github.com/PixVerseAI/cli/blob/86d5ec07f33c7ab8e5030
 The installed CLI 1.4.8 help confirmed status/download argv, patch argument shape,
 voice no-wait/JSON and request tracing. No authentication change was made.
 
-Live generation, real output quality, costs, account-specific permissions and
+Live generation, real media download, output quality, costs, account-specific permissions and
 Canvas dispatch-result/task-history attribution have not been tested. Concurrent
 human version switches can change the current history independently of the
 submitted intent; current-history detection alone cannot prove which generation
 request produced it. Such candidates require sync/provenance review before use.
-Template runtime input sequences, template-specific output kind and strict
-speech/lip synchronization need their own discovered contracts and remain
-fail-closed. They are not implemented by assuming image-to-video behavior.
+Modern template runtime input sequences and strict speech/lip synchronization
+still require exact discovered contracts. They are not implemented by assuming
+image-to-video behavior.
+
+## Conditional preset candidates and execution
+
+`src/presets.mjs` keeps MiniApps and templates outside model-based Create. A
+preset generation is `{backend:'preset',mode:'miniapps'|'template',model:null,
+preset_id,output_kind,parameters,inputs,preset_snapshot}`. The snapshot contains
+`info`, the exact `context`, and `cli_version`. It can include `available` from
+the account catalog and a local `analysis`; these are internal fields and never
+sent as provider parameters. Use the normal shared ledger, bound approval and
+budget before calling the adapter.
+
+`planPresetCandidates({requirements,templates,miniapps,cli_version})` is pure and
+makes zero provider calls. Each item wraps a saved `info` snapshot, optional
+parameters and existing inputs. It compares output kind, fixed duration, aspects,
+editable shots, local replacement, intermediate assets, continuity controls and
+explicit requirement IDs. Missing or unverified controls remain unknown; a preset
+name never proves matching identity, voice or semantic intent. Unknown account
+availability requests discovery. No candidates supplied returns read-only
+list→info commands. Candidate selection is never execution permission.
+
+Evidence-backed local analysis has this shape:
+
+```js
+{
+  evidence:{source:'saved info plus operator inspection',info_sha256:presetSnapshotHash(info)},
+  semantic_fit_confirmed:true, confirmed_requirements:['opening-montage'],
+  continuity_controls:['appearance-reference'],
+  output:{kind:'video',fixed_duration_ms:5000,aspects:['9:16'],
+    editable_shots:false,local_replacement:false,intermediate_assets:[]},
+}
+```
+
+Analysis is bound to the exact snapshot hash. It records inspected constraints;
+it cannot guarantee generated creative quality. Requirements use `output_kind`,
+`duration_ms`, `aspects`, `requires_editable_shots`, `requires_local_replacement`,
+`requires_intermediate_assets`, `continuity_controls`, `requirement_ids`, `intent`
+and `context`. A mismatch rejects that preset. A missing fixed-duration contract
+stays unknown instead of assuming an output override is possible.
+
+`resolvePresetIntent`/`createPresetAdapter().validate` return resolved parameters
+for hashing before approval. `createPresetAdapter({run,infoProvider?})` provides
+submit/status/download. Before submitting, it checks the installed CLI version and
+re-reads info, rejecting changed schemas. `infoProvider` is an offline fixture
+injection. The runner signature is the same as Create; `--version` returns
+`stdout:'1.4.8'` in a fixture. Real status/download always use the retained
+provider identity and never create replacements.
+
+MiniApps use their published flattened `params_schema`. The validator checks
+required fields, enum values, text length, upload count and declared video size.
+Unknown parameter types fail closed. Upload values require existing media-path
+snapshots with the same context; local files and URLs become upload prerequisites
+in a plan rather than triggering an implicit upload. MiniApps have no documented
+idempotency flag. An ambiguous request is returned once for the durable core to
+block and reconcile. Subsequent task/asset commands retain `project_id` with
+`--type miniapps`. Completion inspects the first video, otherwise first image,
+as the primary output. Missing inspection remains pending; a mismatched output
+kind is surfaced. MiniApp output kind requires snapshot-bound analysis evidence,
+since the normalized input schema does not establish an output kind.
+
+The legacy template execution path supports the verified CLI 1.4.8 public
+`effect_type`/`template_type` schema. It validates the exact image count or allowed
+video alternative, preserves input order, derives image versus video output and
+uses a stable idempotency key from the first request. It rejects arbitrary output
+overrides instead of assuming template constraints can be changed. Template
+media must be backed by matching context-bound input snapshots.
+
+The current [CLI README](https://github.com/PixVerseAI/cli#templates) and
+[1.4.9 changelog](https://github.com/PixVerseAI/cli/blob/86d5ec07f33c7ab8e503019b8f6161f698e042a0/CHANGELOG.md)
+describe ordered inputs and fixed template outputs. The installed CLI remains
+1.4.8. The public prose does not supply a captured account-specific ordered-slot
+field schema or exact `outputs` item shape. 1.4.9 template execution therefore
+returns an explicit schema-verification blocker; it is still considered by pure
+candidate planning. Required evidence is a successful read-only `template info`
+response with slot names/types/required order/fixed settings, matching installed
+help/capabilities, output result fixtures and exact CLI pricing evidence. No CLI
+update, guessed private payload, authentication change or paid request is used
+to bypass this condition.
+
+Catalog list reads attempted in this task failed with a network error. No current
+account availability is claimed. The preset tests use documented schema examples
+with explicit fixture annotations, including unknown response, wrong output,
+schema drift and version drift. These tests demonstrate code behavior, not live
+app access. See the [official MiniApps contract](https://github.com/PixVerseAI/skills/blob/main/skills/capabilities/miniapps.md)
+and [legacy template contract](https://github.com/PixVerseAI/skills/blob/6f2c5641031f3d3bd2e54db5280dec735ce94eb3/skills/capabilities/template.md).

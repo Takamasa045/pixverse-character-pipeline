@@ -92,6 +92,91 @@ test('Character project imports local takes and locale edits without inventing a
   assert.equal(JSON.stringify(result).includes('undefined'), false);
 });
 
+test('legacy spokesperson scripts normalize without generation or inferring a modern voice from numeric tts_speaker', async () => {
+  const input = {
+    speaker: { name: 'Neutral Guide', images: ['face.png'], mode: 'single' },
+    announcement: { date: '2026-03-21', topic: 'Legacy Compat Check' },
+    scripts: {
+      ja: { text: 'これは互換性テスト用の原稿です。', audio_mode: 'tts', tts_speaker: 1 },
+      en: { text: 'An existing reading.', audio_mode: 'file', audio_file: 'voice.wav' },
+    },
+    output: {
+      aspect_ratios: ['16:9', '9:16'],
+      model: 'v6',
+      quality: '720p',
+      duration: 5,
+      upscale: true,
+      generate_audio: false,
+      ambient_sound: 'forest',
+      dest: './old-output',
+    },
+    prompt: { base: 'Provided character speaking', per_ratio: { '9:16': 'Portrait framing' } },
+  };
+  await fs.writeFile(path.join(root, 'voice.wav'), 'existing-audio-bytes');
+  const original = structuredClone(input);
+  const migrated = await importLegacy(input, { format: 'character', context, baseDir: root });
+  assert.deepEqual(input, original);
+  assert.deepEqual(migrated.production.migration.original, original);
+  assert.equal(migrated.report.source_variant, 'spokesperson');
+  assert.equal(migrated.production.brief.original, 'Legacy Compat Check');
+  assert.equal(migrated.production.migration.normalization.project_date, '2026-03-21');
+  assert.equal(migrated.production.brief.deliveries.length, 4);
+  assert(migrated.production.brief.deliveries.every((d) => d.duration_ms === 5000));
+  assert.equal(migrated.production.shots[0].generation.parameters.audio, false);
+  assert.equal(migrated.production.shots[0].generation.model, 'v6');
+  const numeric = migrated.report.issues.find(
+    (i) => i.code === 'LEGACY_NUMERIC_TTS_SPEAKER_UNMAPPED',
+  );
+  assert.equal(numeric.original, 1);
+  assert.equal(numeric.voice_id, null);
+  const voice = migrated.report.issues.find((i) => i.code === 'VOICE_ASSET_UNRESOLVED');
+  assert.equal(voice.voice_id, null);
+  assert.equal(voice.text, input.scripts.ja.text);
+  assert.equal(migrated.production.timeline.audio.length, 1);
+  assert.equal(
+    migrated.production.assets.find((a) => a.kind === 'audio').sha256,
+    await fileHash(path.join(root, 'voice.wav')),
+  );
+  assert.equal(migrated.takes.length, 0);
+  assert.equal(migrated.report.generated_jobs, 0);
+  assert(codes(migrated).includes('LEGACY_RATIO_PROMPTS_REQUIRE_PER_DELIVERY_PLAN'));
+  assert(codes(migrated).includes('GENERATED_ASSET_UNRESOLVED'));
+  assert.equal(migrated.production.execution_policy.allowed_scope, 'planning_only');
+  const inferredFormat = await importLegacy(input, { context, baseDir: root });
+  assert.equal(inferredFormat.report.source_format, 'character');
+});
+
+test('spokesperson legacy defaults are explicit provenance and existing string voice IDs remain exact', async () => {
+  const input = {
+    speaker: { images: [] },
+    scripts: {
+      en: { text: 'Hello', voice_id: 'actual-existing-voice' },
+      invalid: 'not a script object',
+    },
+    output: {},
+    prompt: {},
+  };
+  const migrated = await importLegacy(input, { context, baseDir: root });
+  assert.equal(migrated.production.shots[0].edit_duration_ms, 5000);
+  assert.equal(
+    migrated.production.shots[0].generation,
+    undefined,
+    'an absent legacy model is not invented as a current generation route',
+  );
+  assert.equal(
+    migrated.report.issues.find((i) => i.code === 'VOICE_ASSET_UNRESOLVED').voice_id,
+    'actual-existing-voice',
+  );
+  assert(codes(migrated).includes('LEGACY_DEFAULT_APPLIED'));
+  assert(codes(migrated).includes('LEGACY_SCRIPT_INVALID'));
+  assert.equal(
+    migrated.production.migration.normalization.project_date,
+    null,
+    'migration does not invent today as the source date',
+  );
+  assert.deepEqual(migrated.production.migration.original, input);
+});
+
 test('Shotpack storyboard and project import preserve explicit OFF and do not replay paid postprocessing', async () => {
   const input = {
     project: { slug: 'launch' },

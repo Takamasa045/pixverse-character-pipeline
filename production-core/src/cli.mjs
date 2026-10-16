@@ -12,6 +12,7 @@ import {
   attachTakeFile,
   registerLocalTake,
   reviewDelivery,
+  downloadSelectedTake,
 } from './review.mjs';
 import { syncCanvas, adoptTake } from './sync.mjs';
 import {
@@ -22,6 +23,7 @@ import {
   cliBinary,
 } from './pixverse.mjs';
 import { createCanvasAdapter } from './canvas.mjs';
+import { createPresetAdapter, resolvePresetIntent, planPresetCandidates } from './presets.mjs';
 import { renderDeliveries, locateIssue, editTimeline } from './finish.mjs';
 const argv = process.argv.slice(2),
   position = [],
@@ -64,16 +66,35 @@ function production(file) {
 const resolveIntent = (i) =>
   i.backend === 'create'
     ? validateCreateIntent(i, i.capability_snapshot)
-    : (createCanvasAdapter().validate(i), { parameters: i.parameters });
+    : i.backend === 'preset'
+      ? resolvePresetIntent(i)
+      : (createCanvasAdapter().validate(i), { parameters: i.parameters });
 function plan(p) {
   const value = planProduction(p, { resolveIntent }),
     execution_runtime = { binary: cliBinary(), node: process.versions.node };
-  return { ...value, execution_runtime, id: hash({ id: value.id, execution_runtime }) };
+  const preset_candidates = planPresetCandidates({
+    requirements: {
+      intent: p.brief.intent,
+      context: p.context,
+      ...(p.brief.preset_requirements ?? {}),
+    },
+    ...(p.preset_catalog ?? {}),
+  });
+  return {
+    ...value,
+    execution_runtime,
+    preset_candidates,
+    id: hash({ id: value.id, execution_runtime }),
+  };
 }
 function store() {
   return new Store(resolve(required('db')));
 }
-const provider = () => ({ create: createPixVerseAdapter(), canvas: createCanvasAdapter() });
+const provider = () => ({
+  create: createPixVerseAdapter(),
+  canvas: createCanvasAdapter(),
+  preset: createPresetAdapter(),
+});
 async function main() {
   if (!command || command === 'help')
     return print({
@@ -89,6 +110,7 @@ async function main() {
         'reconcile INTENT --results FILE --evidence TEXT --db DB',
         'retry-approval FILE --from APPROVAL --db DB',
         'download INTENT --provider ID --out DEST --db DB',
+        'download-take TAKE --out DIR --db DB',
         'review TAKE --qa FILE --accept --db DB',
         'attach TAKE --file FILE --evidence TEXT --db DB',
         'adopt FILE --shot ID --take ID --db DB',
@@ -106,6 +128,7 @@ async function main() {
         'edit FILE --patch FILE',
         'migrate FILE --kind character|shotpack|registry|manifest [--context FILE] [--out FILE]',
         'capabilities MODE --model MODEL',
+        'preset-candidates FILE',
       ],
       note: 'plan/dry-run never call PixVerse; approval must reflect existing human authorization',
     });
@@ -126,6 +149,7 @@ async function main() {
     if (!v.valid) process.exitCode = 1;
     return print(v);
   }
+  if (command === 'preset-candidates') return print(planPresetCandidates(json(target)));
   if (command === 'plan' || (command === 'run' && flag('dry-run'))) {
     const p = production(target),
       value = plan(p);
@@ -159,6 +183,10 @@ async function main() {
         end_ms: Number(required('end-ms')),
         kind: required('kind'),
         details: options.details ?? '',
+        expected: options.expected ?? null,
+        observed: options.observed ?? null,
+        confidence: options.confidence ?? null,
+        delivery_id: typeof options.variant === 'string' ? options.variant : undefined,
       }),
     );
   if (command === 'edit') return print(editTimeline(production(target), json(required('patch'))));
@@ -263,6 +291,8 @@ async function main() {
           resolve(required('out')),
         ),
       );
+    if (command === 'download-take')
+      return print(await downloadSelectedTake(s, target, resolve(required('out'))));
     if (command === 'review')
       return print(
         reviewTake(s, target, json(required('qa')), {

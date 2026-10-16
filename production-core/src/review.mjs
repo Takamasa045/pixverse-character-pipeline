@@ -1,5 +1,8 @@
 import { requireValue, fileHash, hash } from './contracts.mjs';
 import { performanceReview } from './character.mjs';
+import { existsSync } from 'node:fs';
+import { downloadCanvasSelection } from './canvas.mjs';
+import { impactAnalysis } from './planner.mjs';
 export function reviewTake(store, id, qa, { accept = false, reevaluate = false } = {}) {
   const take = store.take(id);
   requireValue(take, 'take not found');
@@ -51,15 +54,66 @@ export function attachTakeFile(store, id, path, evidence) {
     'file provenance evidence required',
   );
   requireValue(
-    !take.path,
+    !take.path || !existsSync(take.path),
     'take already has a local file; create a new take instead of replacing bytes',
   );
   return store.transaction(() => {
-    const next = { ...take, path, sha256: fileHash(path), status: 'downloaded', qa: null };
+    const sha256 = fileHash(path),
+      restored = take.sha256 === sha256;
+    const next = {
+      ...take,
+      path,
+      sha256,
+      status: restored ? take.status : 'downloaded',
+      qa: restored ? take.qa : null,
+    };
     store.putTake(next);
     store.event('file_attached', id, { path, evidence });
     return next;
   });
+}
+export async function downloadSelectedTake(
+  store,
+  id,
+  destination,
+  { download = downloadCanvasSelection, ...options } = {},
+) {
+  const take = store.take(id);
+  requireValue(take?.provenance?.backend === 'canvas', 'a recorded Canvas selection is required');
+  if (take.path && existsSync(take.path)) {
+    requireValue(
+      !take.sha256 || fileHash(take.path) === take.sha256,
+      'saved selected take has changed bytes',
+    );
+    return take;
+  }
+  const p = take.provenance;
+  requireValue(
+    p.project_id && p.node_id && p.history_id && p.context,
+    'Canvas selection provenance is incomplete',
+  );
+  const result = await download(
+    {
+      project_id: p.project_id,
+      node_id: p.node_id,
+      history_id: p.history_id,
+      context: p.context,
+      destination,
+      kind: take.kind,
+    },
+    options,
+  );
+  const file = result.results?.find((r) => r.path && r.history_id === p.history_id);
+  if (result.exit_code !== 0 || !file) {
+    store.event('download_failed', id, result);
+    throw new Error(result.error ?? 'Canvas selected media was not saved');
+  }
+  return attachTakeFile(
+    store,
+    id,
+    file.path,
+    `Verified Canvas selected history ${p.history_id} before and after transfer`,
+  );
 }
 export function registerLocalTake(store, input) {
   requireValue(
@@ -144,13 +198,29 @@ export function reviewDelivery(bundle, qa) {
     deliveries: bundle.deliveries.map((d) => ({ ...d, creative_delivery_review: 'accepted' })),
   };
 }
-export function markStale(store, project, { shotIds = [], entityIds = [] }, reason) {
+export function markStale(store, project, { shotIds = [], entityIds = [], assetIds = [] }, reason) {
+  const production = store.document('production', project);
+  const seeds = new Set(shotIds);
+  for (const take of store.takes(project))
+    if (
+      (take.provenance?.entity_revisions ?? []).some((e) => entityIds.includes(e.id)) ||
+      (take.provenance?.inputs ?? []).some(
+        (a) => entityIds.includes(a.entity_id) || assetIds.includes(a.id),
+      )
+    )
+      seeds.add(take.shot_id);
+  const affected = new Set(
+    production ? impactAnalysis(production, [...seeds, ...entityIds, ...assetIds]).shots : seeds,
+  );
   return store.transaction(() => {
     const changed = [];
     for (const take of store.takes(project))
       if (
-        shotIds.includes(take.shot_id) ||
-        (take.provenance?.inputs ?? []).some((a) => entityIds.includes(a.entity_id))
+        affected.has(take.shot_id) ||
+        (take.provenance?.entity_revisions ?? []).some((e) => entityIds.includes(e.id)) ||
+        (take.provenance?.inputs ?? []).some(
+          (a) => entityIds.includes(a.entity_id) || assetIds.includes(a.id),
+        )
       ) {
         store.putTake({ ...take, stale: true, stale_reason: reason });
         store.event('stale', take.id, { reason });

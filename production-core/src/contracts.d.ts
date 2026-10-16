@@ -17,6 +17,7 @@ export interface Asset {
   path?: string;
   sha256?: string;
   provider_id?: string;
+  media_path?: string;
   region: string;
   workspace_id: string;
   provenance: unknown;
@@ -34,9 +35,9 @@ export interface GenerationIntent {
   project_id: string;
   shot_id: string;
   attempt: number;
-  backend: 'create' | 'canvas';
+  backend: 'create' | 'canvas' | 'preset';
   mode: string;
-  model: string;
+  model: string | null;
   parameters: Record<string, unknown>;
   inputs: (Asset & { binding?: ReferenceBinding })[];
   owners?: string[];
@@ -45,6 +46,9 @@ export interface GenerationIntent {
   upper_credits: number | null;
   price_evidence: unknown;
   capability_snapshot: unknown;
+  preset_snapshot?: unknown;
+  preset_id?: string;
+  output_kind?: 'image' | 'video';
   canvas?: Record<string, unknown>;
 }
 export interface Take {
@@ -115,14 +119,17 @@ export interface ShotSpec {
   generation?: GenerationSpec;
 }
 export interface GenerationSpec {
-  backend: 'create' | 'canvas';
+  backend: 'create' | 'canvas' | 'preset';
   mode: string;
-  model: string;
+  model: string | null;
   attempt?: number;
   parameters?: Record<string, unknown>;
   upper_credits?: number | null;
   price_evidence?: unknown;
   capability_snapshot?: unknown;
+  preset_snapshot?: unknown;
+  preset_id?: string;
+  output_kind?: 'image' | 'video';
   canvas?: Record<string, unknown>;
 }
 export interface EditTimeline {
@@ -134,6 +141,8 @@ export interface EditTimeline {
     duration_ms: number;
     audio?: boolean;
     volume?: number;
+    crop?: PixelRect;
+    protected_regions?: (PixelRect & { label?: string })[];
     locale?: string;
     variant_id?: string;
     delivery_id?: string;
@@ -165,7 +174,9 @@ export interface Production {
       width?: number;
       height?: number;
       timeline?: EditTimeline;
-      caption_mode?: 'off' | 'sidecar';
+      caption_mode?: 'off' | 'sidecar' | 'burn_in' | 'both';
+      caption_style?: CaptionStyle;
+      qc?: QualityPolicy;
     }[];
   };
   entities: {
@@ -189,5 +200,33 @@ export interface Production {
     max_credits: number | null;
     max_attempts: number;
   };
+  dependencies?: { id: string; depends_on: string[] }[];
+  preset_catalog?: Record<string, unknown>;
   timeline: EditTimeline;
+}
+
+export interface PixelRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface CaptionStyle {
+  font_path: string;
+  font_size: number;
+  safe_area: PixelRect;
+  font_index?: number;
+  line_spacing?: number;
+  padding?: number;
+  align?: 'left' | 'center' | 'right';
+  vertical_align?: 'top' | 'center' | 'bottom';
+  color?: string;
+  background_color?: string;
+}
+export interface QualityPolicy {
+  expected_audio?: boolean;
+  max_black_interval_ms?: number;
+  max_silence_interval_ms?: number;
+  min_mean_volume_db?: number;
+  max_peak_volume_db?: number;
 }

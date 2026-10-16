@@ -52,6 +52,19 @@ export function validateProduction(p) {
   check(Array.isArray(p?.shots) && p.shots.length > 0, 'shots required');
   check(Array.isArray(p?.assets), 'assets required');
   const ids = new Set();
+  const generation = (g, id) => {
+    check(['create', 'canvas', 'preset'].includes(g.backend), `${id}: backend required`);
+    check(typeof g.mode === 'string', `${id}: mode required`);
+    if (g.backend === 'preset') {
+      check(
+        g.model === null && ['template', 'miniapps'].includes(g.mode),
+        `${id}: preset model must be null and mode explicit`,
+      );
+      check(typeof g.preset_id === 'string' && g.preset_id.length > 0, `${id}: preset_id required`);
+      check(['image', 'video'].includes(g.output_kind), `${id}: preset output_kind required`);
+    } else check(typeof g.model === 'string', `${id}: model required`);
+    check(Number.isSafeInteger(g.attempt ?? 1) && (g.attempt ?? 1) > 0, `${id}: invalid attempt`);
+  };
   const assetIds = new Set((p?.assets ?? []).map((a) => a.id));
   check(assetIds.size === (p?.assets ?? []).length, 'duplicate asset id');
   for (const a of p?.assets ?? []) {
@@ -97,16 +110,13 @@ export function validateProduction(p) {
       orders.add(r.order);
     }
     if (s.generation) {
-      check(['create', 'canvas'].includes(s.generation.backend), `${s.shot_id}: backend required`);
-      check(
-        typeof s.generation.model === 'string' && typeof s.generation.mode === 'string',
-        `${s.shot_id}: model/mode required`,
-      );
-      check(
-        Number.isSafeInteger(s.generation.attempt ?? 1) && (s.generation.attempt ?? 1) > 0,
-        `${s.shot_id}: invalid attempt`,
-      );
+      generation(s.generation, s.shot_id);
     }
+  }
+  for (const job of p?.jobs ?? []) {
+    check(typeof job.shot_id === 'string' && !ids.has(job.shot_id), 'unique job/shot ID required');
+    ids.add(job.shot_id);
+    if (job.generation) generation(job.generation, job.shot_id);
   }
   const total = (p?.shots ?? []).reduce((n, s) => n + s.edit_duration_ms, 0);
   const variants = new Set();

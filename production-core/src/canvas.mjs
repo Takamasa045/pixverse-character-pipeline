@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { cliRunner, withContext, validateCreateIntent } from './pixverse.mjs';
+import { downloadCanvasMedia } from './media-download.mjs';
 
 const fail = (message) => {
   throw new Error(message);
@@ -504,7 +505,114 @@ export function normalizeCanvasResult(raw, node_id, kind = 'video', exit_code = 
   };
 }
 
-export function createCanvasAdapter({ run = cliRunner(), capabilities, downloadMedia } = {}) {
+function trustedMediaUrl(node) {
+  const paths = [
+    node?.file_path,
+    node?.url,
+    node?.info?.file_path,
+    node?.info?.url,
+    node?.data?.file_path,
+    node?.data?.url,
+  ];
+  return (
+    paths.find((value) => typeof value === 'string' && value.startsWith('https://')) ??
+    paths.find(Boolean)
+  );
+}
+
+/** Fetch the exact current human/agent selected history without creating any media. */
+export async function downloadCanvasSelection(
+  { project_id, node_id, history_id, context, destination, kind = 'video' },
+  { run = cliRunner(), downloadMedia, downloadOptions = {} } = {},
+) {
+  id(project_id, 'project_id');
+  id(node_id, 'node_id');
+  id(history_id, 'history_id');
+  const read = async () => {
+    const response = await run(
+      withContext(['canvas', 'node', 'get', project_id, '--node-id', node_id, '--json'], context),
+      { context },
+    );
+    const data = envelope(response.raw),
+      node = data?.node ?? data;
+    if (
+      !successful(response) ||
+      !node ||
+      ((node.node_id ?? node.id) && (node.node_id ?? node.id) !== node_id)
+    )
+      fail('Canvas selected node could not be read');
+    let state = node.derived_state;
+    if (!state) {
+      const status = await run(
+        withContext(
+          ['canvas', 'graph', 'status', project_id, '--node-ids', node_id, '--json'],
+          context,
+        ),
+        { context },
+      );
+      const nodes = envelope(status.raw)?.nodes;
+      const entry = Array.isArray(nodes)
+        ? nodes.find((n) => (n.node_id ?? n.id) === node_id)
+        : nodes?.[node_id];
+      if (!successful(status) || !entry)
+        fail('Canvas selected node completion could not be confirmed');
+      state = entry.derived_state;
+    }
+    if (state !== 'SUCCEEDED' || selectedVersion(node) !== history_id)
+      fail('Canvas selected history changed or is not complete');
+    const url = trustedMediaUrl(node);
+    if (!url) fail('Canvas current node has no trusted media URL');
+    return { node, url, response };
+  };
+  let local;
+  try {
+    const before = await read();
+    const transfer = downloadMedia ?? ((request) => downloadCanvasMedia(request, downloadOptions));
+    local = await transfer({
+      file_path: before.url,
+      destination,
+      context,
+      node: clone(before.node),
+      kind,
+      identity: { project_id, node_id, history_id },
+    });
+    if (!local?.path) fail('Canvas downloader returned no saved path');
+    const after = await read();
+    if (after.url !== before.url)
+      fail('Canvas selected media URL changed during transfer; inspect retained file');
+    return {
+      results: [
+        {
+          id: node_id,
+          kind,
+          status: 'completed',
+          path: local.path,
+          sha256: local.sha256,
+          bytes: local.bytes,
+          history_id,
+        },
+      ],
+      exit_code: 0,
+      raw: after.response.raw,
+    };
+  } catch (error) {
+    return {
+      results: [],
+      exit_code: 1,
+      error: error.message,
+      code: error.code,
+      ...(local?.path ? { retained_file: local } : {}),
+      identity: { project_id, node_id, history_id },
+    };
+  }
+}
+
+export function createCanvasAdapter({
+  run = cliRunner(),
+  capabilities,
+  downloadMedia,
+  downloadOptions = {},
+} = {}) {
   return {
     validate(intent) {
       const canvas = requestCanvas(intent);
@@ -672,7 +780,7 @@ export function createCanvasAdapter({ run = cliRunner(), capabilities, downloadM
       const history = selectedVersion(node);
       if (
         !successful(response) ||
-        node?.derived_state !== 'SUCCEEDED' ||
+        (node?.derived_state && node.derived_state !== 'SUCCEEDED') ||
         !history ||
         history === canvas.baseline_history_id
       )
@@ -682,14 +790,7 @@ export function createCanvasAdapter({ run = cliRunner(), capabilities, downloadM
           error: 'Canvas result is not confirmed newly complete',
           raw: response.raw,
         };
-      const filePath = node?.file_path ?? node?.info?.file_path ?? node?.data?.file_path;
-      if (!downloadMedia)
-        return {
-          results: [],
-          exit_code: 6,
-          error: 'Canvas media downloader is not configured; existing node retained',
-          raw: response.raw,
-        };
+      const filePath = trustedMediaUrl(node);
       if (!filePath)
         return {
           results: [],
@@ -697,22 +798,19 @@ export function createCanvasAdapter({ run = cliRunner(), capabilities, downloadM
           error: 'Canvas current node has no trusted file_path',
           raw: response.raw,
         };
-      // Injected finishing transport downloads this known media only. It must use
-      // no-overwrite publication and must never create a replacement generation.
-      const local = await downloadMedia({
-        file_path: filePath,
-        destination,
-        context: intent.context,
-        node: clone(node),
-      });
-      if (!local?.path) fail('Canvas downloader returned no saved path');
-      return {
-        results: [
-          { id: provider_id, kind: intent.kind ?? 'video', status: 'completed', path: local.path },
-        ],
-        exit_code: 0,
-        raw: response.raw,
-      };
+      // Selection helper re-reads before/after transfer and never uses a Graph
+      // history/node ID as a Create media ID.
+      return downloadCanvasSelection(
+        {
+          project_id: canvas.project_id,
+          node_id: provider_id,
+          history_id: history,
+          context: intent.context,
+          destination,
+          kind: intent.kind ?? 'video',
+        },
+        { run, downloadMedia, downloadOptions },
+      );
     },
   };
 }
