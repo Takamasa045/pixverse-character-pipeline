@@ -1,0 +1,327 @@
+{
+  "schema_version": "pixverse_create_capability_query.v1",
+  "source": "bundled",
+  "query": {
+    "mode": "reference",
+    "model": "v6"
+  },
+  "capability": {
+    "capability_id": "create.reference",
+    "command": "pixverse create reference",
+    "description": "Create or edit a video with reference media.",
+    "default_model": "v6",
+    "parameters": {
+      "images": {
+        "flag": "--images",
+        "type": "media_list",
+        "required": false,
+        "accepts": [
+          "local_path",
+          "https_url",
+          "asset_id",
+          "media_path"
+        ],
+        "max_count": 10,
+        "on_invalid": "reject",
+        "description": "Reference images."
+      },
+      "videos": {
+        "flag": "--videos",
+        "type": "media_list",
+        "required": false,
+        "accepts": [
+          "local_path",
+          "https_url",
+          "asset_id",
+          "media_path"
+        ],
+        "max_count": 2,
+        "on_invalid": "reject",
+        "description": "Reference videos.",
+        "supported": true
+      },
+      "audios": {
+        "flag": "--audios",
+        "type": "media_list",
+        "required": false,
+        "accepts": [
+          "local_path",
+          "https_url",
+          "asset_id",
+          "media_path"
+        ],
+        "on_invalid": "reject",
+        "description": "Reference audio clips.",
+        "supported": false
+      },
+      "prompt": {
+        "flag": "--prompt",
+        "type": "text",
+        "required": true,
+        "accepts": [
+          "literal",
+          "local_file",
+          "stdin"
+        ],
+        "on_invalid": "reject",
+        "description": "Generation or editing prompt."
+      },
+      "model": {
+        "flag": "--model",
+        "type": "string",
+        "required": false,
+        "default": "v6",
+        "enum": [
+          "v6"
+        ],
+        "on_invalid": "reject",
+        "description": "Generation model."
+      },
+      "quality": {
+        "flag": "--quality",
+        "type": "string",
+        "required": false,
+        "default": "720p",
+        "unit": "output_resolution",
+        "on_invalid": "adjust",
+        "description": "Output quality where the selected model supports it.",
+        "supported": true,
+        "enum": [
+          "360p",
+          "540p",
+          "720p",
+          "1080p"
+        ]
+      },
+      "count": {
+        "flag": "--count",
+        "type": "integer",
+        "required": false,
+        "default": 1,
+        "min": 1,
+        "max": 4,
+        "unit": "count",
+        "on_invalid": "reject",
+        "description": "Number of generation results."
+      },
+      "seed": {
+        "flag": "--seed",
+        "type": "integer",
+        "required": false,
+        "on_invalid": "reject",
+        "description": "Random seed for reproducible generation."
+      },
+      "idempotency_key": {
+        "flag": "--idempotency-key",
+        "type": "string",
+        "required": false,
+        "on_invalid": "backend",
+        "description": "Caller-provided key for safe request retries."
+      },
+      "wait": {
+        "flag": "--no-wait",
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "description": "Wait for the generated asset unless disabled."
+      },
+      "timeout": {
+        "flag": "--timeout",
+        "type": "integer",
+        "required": false,
+        "default": 300,
+        "min": 1,
+        "unit": "seconds",
+        "on_invalid": "reject",
+        "description": "Polling timeout when waiting for completion."
+      },
+      "json": {
+        "flag": "--json",
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "Write pure JSON to stdout."
+      },
+      "duration": {
+        "flag": "--duration",
+        "type": "integer",
+        "required": false,
+        "default": 5,
+        "unit": "seconds",
+        "on_invalid": "adjust",
+        "description": "Output duration in seconds; 0 is the normalized automatic-duration value where supported (use \"auto\" in the CLI).",
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          0
+        ]
+      },
+      "audio": {
+        "flag": "--audio / --no-audio",
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "on_invalid": "reject",
+        "description": "Enable generated audio.",
+        "supported": true
+      },
+      "off_peak": {
+        "flag": "--off-peak",
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "on_invalid": "adjust",
+        "description": "Use off-peak generation where supported.",
+        "supported": true
+      },
+      "task_type": {
+        "flag": "--task-type",
+        "type": "string",
+        "required": false,
+        "supported": false,
+        "on_invalid": "reject",
+        "description": "Seedance 2.5 reference task type."
+      },
+      "aspect_ratio": {
+        "flag": "--aspect-ratio",
+        "type": "string",
+        "required": false,
+        "default": "16:9",
+        "unit": "width:height",
+        "on_invalid": "adjust",
+        "description": "Output framing or auto where supported.",
+        "supported": true,
+        "enum": [
+          "16:9",
+          "21:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16",
+          "3:2",
+          "2:3"
+        ]
+      }
+    },
+    "models": {
+      "v6": {
+        "id": "v6",
+        "display_name": "PixVerse V6",
+        "default": true,
+        "parameters": {
+          "duration": {
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              0
+            ],
+            "default": 5,
+            "on_invalid": "adjust"
+          },
+          "quality": {
+            "supported": true,
+            "enum": [
+              "360p",
+              "540p",
+              "720p",
+              "1080p"
+            ],
+            "default": "720p",
+            "on_invalid": "adjust"
+          },
+          "aspect_ratio": {
+            "supported": true,
+            "enum": [
+              "16:9",
+              "21:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "3:2",
+              "2:3"
+            ],
+            "default": "16:9",
+            "on_invalid": "adjust"
+          },
+          "audio": {
+            "supported": true,
+            "on_invalid": "reject",
+            "description": "Enable generated audio."
+          },
+          "off_peak": {
+            "supported": true
+          },
+          "images": {
+            "max_count": 10
+          },
+          "videos": {
+            "supported": true,
+            "max_count": 2
+          },
+          "audios": {
+            "supported": false,
+            "max_count": 0
+          },
+          "task_type": {
+            "supported": false,
+            "on_invalid": "reject"
+          }
+        },
+        "metadata": {
+          "max_video_duration_seconds": 15
+        }
+      }
+    },
+    "rules": [
+      {
+        "id": "reference-media-required",
+        "description": "At least one supported image, video, or audio reference is required.",
+        "when": {
+          "always": true
+        }
+      },
+      {
+        "id": "audio-requires-visual-reference",
+        "description": "Audio references require an image or video reference except where the selected model explicitly supports audio-only input.",
+        "when": {
+          "model": {
+            "not_in": [
+              "wan-3.0"
+            ]
+          },
+          "audios": {
+            "min_count": 1
+          }
+        }
+      }
+    ],
+    "selected_model": "v6"
+  }
+}

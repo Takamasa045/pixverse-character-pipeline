@@ -1,5 +1,7 @@
 # DECISIONS.md
 
+Current default: the 2026-10-16 production.v1 redesign below supersedes historical YAML routing, fixed CLI pins, automatic I2I/three-view generation and duplicate runtime ownership. Earlier entries are retained as history.
+
 このファイルは、この repo の判断履歴を残す場所です。
 
 新しい判断は上に追記します。長い議論ではなく、後から AI エージェントが「なぜそうなっているか」を読める粒度にします。
@@ -409,3 +411,18 @@ Impacted files:
 Follow-up:
 
 - Re-check this on future CLI refreshes.
+
+
+## 2026-10-16 - Two entries and one shared production core
+
+Adopt the complete redesign: Character owns recurring identity, wardrobe, voice and world revisions; Shotpack owns the production, shots, take adoption, edits and final delivery. Shared production.v1 contracts, SQLite execution/cost state, capabilities, reference provenance, Canvas merge and resume live in Shotpack's canonical `production-core/`, vendored byte-for-byte here. Root `./bin/production` is the default, Node >=22.18 with no new npm dependencies.
+
+Old entry-point documents are retained verbatim under `references/legacy-*.md`. Old YAML/manifest inputs are migration boundaries, not the internal source of truth. Do not rewrite old projects or promote unknown legacy QA/cost to accepted status. Keep original media and baseline for rollback.
+
+Paid work requires a concrete approved scope and upper credits; valid authorization covers its scope. Unknown submission blocks automatic resend. Known IDs resume without a new submit. Voice/music tracing is not provider deduplication. Explicit false is preserved. Completion is distinct from accepted take and checked local delivery.
+
+No mandatory three-view/I2I stage, universal image-first rule, fixed model table or Remotion-first architecture remains in the active entry. TTS is narration unless an independent verified synchronization path proves otherwise. Fixture tests prove contracts; creative quality, precise prices and provider behavior require a separately approved live evaluation.
+
+## 2026-10-16 — Legacy render isolation
+
+Use the installed public bundler API with `enableCaching:false` and a unique temporary bundle/public directory. Remotion CLI `--bundle-cache=false` in the legacy version deletes existing caches and must not be used as a cache-preservation mechanism. Stage only referenced local files, reject path escapes, and keep sandbox and origin protections in Chromium. Choose an existing browser explicitly when needed; never download one implicitly. A managed execution sandbox may block browser launch even when the same binary works from the normal local shell.

@@ -1,6 +1,10 @@
 .DS_Store
 .claude/settings.local.json
 output/
-remotion/node_modules/
+remotion/node_modules
+.production/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 remotion/out/
 remotion/public/.pipeline/

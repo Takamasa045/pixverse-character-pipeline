@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REMOTION_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+
+if [[ -n "${NVM_BIN:-}" ]]; then
+  export PATH="${NVM_BIN}:${PATH}"
+fi
+
+NODE_BIN="$(command -v node || true)"
+if [[ -z "${NODE_BIN}" ]]; then
+  echo "node was not found on PATH" >&2
+  exit 1
+fi
+
+exec "${NODE_BIN}" \
+  --import "${REMOTION_ROOT}/node_modules/tsx/dist/loader.mjs" \
+  "${REMOTION_ROOT}/src/cli/pipeline.ts" \
+  "$@"

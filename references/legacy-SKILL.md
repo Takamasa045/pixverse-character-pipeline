@@ -1,0 +1,477 @@
+---
+name: character-video-pipeline
+description: >
+  Generate character videos from a single character image. Three modes:
+  (A) Creative workflow — 3-view turnaround, cut image generation, I2I, I2V, lip sync, Remotion edit.
+  (B) Config-driven pipeline — project.yaml → validate → plan → run → render.
+  (C) Reference story workflow — per-cut `pixverse create reference --images` → voice audio asset → pipeline timeline.
+  Use when the user says "character video", "talking character", "lip sync video",
+  "キャラクター動画", "多言語アナウンス動画", "multilingual video",
+  "このキャラで動画作って", "キャラを実写背景に馴染ませて".
+metadata:
+  version: "3.5"
+---
+
+# Character Video Pipeline
+
+キャラクター画像1枚から、実写背景に馴染ませた紹介動画・多言語アナウンス動画を制作する。
+
+## When to Use
+
+- キャラ画像から紹介動画・プロモ動画を作りたいとき
+- アニメキャラ × フォトリアル背景の映像を作りたいとき
+- キャラ一貫性を保ったまま複数カットの動画を作りたいとき
+- 多言語・複数アスペクト比のバッチ生成が必要なとき
+
+## Three Modes
+
+| | Mode A: Creative Workflow | Mode B: Config-Driven Pipeline | Mode C: Reference Story Workflow |
+|--|--------------------------|-------------------------------|----------------------------------|
+| 駆動 | エージェントがフェーズごとに実行 | `./bin/pipeline` CLI が自動実行 | エージェントが各カットを個別生成し、最後だけ pipeline で編集 |
+| 向き | 単言語、カット構成にこだわりたい | 多言語バッチ、再現性重視 | ティザー、トレーラー、物語型のマルチカット |
+| 入力 | キャラ画像 + 対話 | `project.yaml` | キャラ画像 + 対話 |
+| 画像/動画生成 | PixVerse I2I + PixVerse I2V | PixVerse（プロンプト駆動） | PixVerse `create reference --images` を各カットごとに使う |
+| 出力 | `manifest.json`（手動） → Remotion | `manifest.render.json`（自動） → Remotion | ローカル `video` クリップを並べた `project.yaml` → Remotion |
+
+---
+
+## Critical Rules
+
+0. **添付キャラ画像は既定で `single` として扱う** — 画像が 1 枚でも複数枚でも、まず `generation.image.model: gemini-3.1-flash` / `generation.image.quality: 1080p` の I2I → `generation.model: v6` の I2V を使う。明示的な story / teaser / trailer / multi-cut 指示がない限り `reference` へ寄せない
+1. **3面図は必ず最初に作る** — キャラ一貫性の土台。複数カットに進む前に必須（Mode A）
+2. **画像生成は PixVerse `create image` を使う** — 3面図もカット画像も `--image` / `--images` の I2I で作る。`generation.image.model` には PixVerse CLI の image model を指定する
+3. **動画生成は I2V を優先** — 単一画像フローでは合成画像を `create video --image` に渡す。T2V はキャラ一貫性が崩れやすい
+4. **ナレーションは PixVerse `create voice` または `audioFile`** — CLI 1.2.x では音声を別アセットとして作り、Remotion の `narrationSrc` でカットに重ねる
+5. **Every PixVerse call must include `--json`**
+6. **カメラワークの重複禁止** — 全カット同じカメラワークにしない（→ `references/prompt-library.md`）
+7. **固定尺スライドショー禁止** — カットごとに秒数を変えてリズムを作る（4/5/6/4/3s など）
+8. **構成設計は `short-video-editing` スキルに従う**
+9. **`story` / `teaser` / `trailer` / `multi-cut` 指示では Mode C を優先** — 共有ベース動画ではなく、各カットを個別に `pixverse create reference --images` で作る
+10. **Mode C では `source: reference` を優先** — pipeline runtime で各カットを直接 reference 生成できる。すでにローカル素材化済みなら `video` へ落としてよい
+11. **PixVerse CLI 1.2.7 では reference も `v6` 対応** — `generation.model` と `generation.referenceModel` の既定はどちらも `v6`。C1 寄りの reference 表現が必要なときだけ `pixverse-c1` に上書きする
+12. **モデル表は `references/model-support.md` を見る** — CLI README と公式 skill の表を突き合わせた repo-local source of truth
+13. **CLI制作ルーティングは `references/model-routing.md` を見る** — PixVerse CLI の command family、model candidate、batch、post-process、audio、QC を先に選ぶ
+14. **クレジット見積もりは `references/credit-estimation.md` を見る** — job count だけでなく、承認前に概算クレジット帯を報告する
+15. **retry / exit 契約は `references/exit-codes.md` を見る** — timeout / auth / credit / generation / validation の扱いを揃える
+16. **再利用できる教訓は `references/` に成文化する** — session memory や raw run log に閉じ込めない（→ `references/lesson-codification.md`）
+
+---
+
+## Mode A: Creative Workflow
+
+```
+キャラ画像 (1枚)
+    ▼
+Phase 1: 3面図生成 (PixVerse CLI)
+    ▼
+Phase 2: カット画像生成 (PixVerse CLI) — 実写背景に合成
+    ▼
+Phase 3: I2V 動画化 (PixVerse CLI)
+    ▼
+Phase 4: ナレーション音声生成 (PixVerse CLI)
+    ▼
+Phase 5: Remotion 編集・レンダリング
+    ▼
+完成動画 (.mp4)
+```
+
+### Phase 1: 3面図生成
+
+PixVerse `create image` で正面・3/4・背面の3アングルを含む 3面図を生成:
+
+```bash
+pixverse create image \
+  --image [元キャラ画像パス] \
+  --prompt "Character turnaround sheet of [キャラ説明]. Three views side by side: front view, 3/4 view, and back view. Clean white background, full body, consistent proportions, character design reference sheet style." \
+  --model gemini-3.1-flash \
+  --quality 1080p \
+  --aspect-ratio 16:9 \
+  --no-wait --json
+```
+
+補足:
+- 複数の参照画像がある場合は `--image` の代わりに `--images` を使う
+- `gemini-3.1-flash` はこの workflow の既定値。PixVerse CLI 1.2.7 では `gpt-image-2.0`、`qwen-image`、`gemini-3.0`、`seedream-5.0-lite`、Kling 系 image model なども使える
+
+### Phase 2: カット画像生成
+
+3面図を参照して、カットごとの合成画像を生成:
+
+```bash
+pixverse create image \
+  --image [3面図または参照画像パス] \
+  --prompt "[キャラ説明] in [シーン説明]. Photorealistic [背景説明]. Character naturally composited into real photograph. [ショットサイズ], [ライティング]." \
+  --model gemini-3.1-flash \
+  --quality 1080p \
+  --aspect-ratio 16:9 \
+  --no-wait --json
+```
+
+プロンプトのコツ:
+- `"character naturally composited into real photograph"` を必ず入れる
+- 背景は `"photorealistic"` `"real"` を明示する
+- キャラ説明は性別・髪型・服装を毎回書く（一貫性のため）
+- 複数の参照を混ぜたい場合は `--images` を使う
+
+### Phase 3: I2V 動画化
+
+```bash
+pixverse create video \
+  --image [合成画像パス] \
+  --prompt "[シーンの動き・変化を2-4文で記述]" \
+  --aspect-ratio 16:9 \
+  --model v6 \
+  --duration [4-8] \
+  --quality 720p \
+  --no-wait --json
+```
+
+プロンプトのコツ:
+- 動きの始まりと終わりを書く（transition_description）
+- キャラの微動（まばたき、髪の揺れ、呼吸）を指示する
+- 背景の動き（風、光、雲）も加える
+- カメラワークを文中に含める（→ `references/prompt-library.md`）
+
+### Phase 4: ナレーション音声
+
+ナレーション付きカットに適用:
+
+```bash
+pixverse create voice \
+  --text "[ナレーションテキスト]" \
+  --model speech-2.8-hd \
+  --no-wait --json
+```
+
+注意:
+- 日本語の場合「AI」→「えーあい」など読み補正が必要なことがある
+- 特定の声を使う場合は、`pixverse voice presets --model <id>` で確認した PixVerse preset voice ID を `voiceId` に入れる
+- 既存音声を使う場合は `audioFile` を指定し、PixVerse voice job を作らない
+
+### Phase 5: Remotion 編集
+
+manifest.json を手動で作成し、Remotion でレンダリング:
+
+```json
+{
+  "bgm": "assets/audio/bgm.mp3",
+  "bgmVolume": 0.12,
+  "speakerImage": "assets/speaker.jpg",
+  "theme": {
+    "background": "#1a2e1a",
+    "accent": "#D4913A",
+    "text": "#ffffff"
+  },
+  "cuts": [
+    {
+      "id": "hook",
+      "startFrame": 0,
+      "durationInFrames": 120,
+      "videoSrc": "assets/cuts/cut-hook.mp4",
+      "imageSrc": null,
+      "overlayText": "",
+      "overlayStyle": "none",
+      "hasAudio": false
+    }
+  ]
+}
+```
+
+**overlayStyle**: `"none"` / `"subtitle"` / `"title"` / `"lower-third"` / `"endcard"`
+
+**hasAudio ルール**:
+
+| ケース | hasAudio | 説明 |
+|--------|----------|------|
+| PixVerse voice / audioFile あり | `true` | Remotion で `narrationSrc` を重ねる |
+| BGM のみ | `false` | 動画をミュート再生 |
+| エンドカード | `false` | 静止画なので音声なし |
+
+レンダリング後は `ffprobe` で検証（尺・ストリーム・黒フレーム）。
+
+---
+
+## Mode B: Config-Driven Pipeline
+
+Mode B は案内動画や多言語量産には向くが、強い場面転換が必要なストーリー動画にはそのままだと不向き。
+`source: generated` はアスペクト比ごとに 1 本のベース動画を共有するため、カットごとに背景や演出を大きく変えたい場合は Mode C を使う。
+
+### Config Model
+
+`project.yaml` が入力:
+
+```yaml
+project:
+  slug: my-campaign
+  title: Spring Campaign
+  date: "2026-03-21"
+
+speaker:
+  name: Reporter Hana
+  images:
+    - ./assets/hana.png
+  mode: single
+
+locales:
+  ja:
+    theme:
+      background: "#111111"
+      accent: "#ff6b35"
+      text: "#ffffff"
+    clips:
+      - id: intro
+        source: generated
+        text: 本日のお知らせです
+        durationSeconds: 5
+        overlayText: 春のキャンペーン開始
+        overlayStyle: title
+      - id: endcard
+        source: image
+        asset: ./assets/endcard.png
+        durationSeconds: 3
+        overlayText: example.com
+        overlayStyle: endcard
+
+render:
+  aspectRatios: ["16:9", "9:16"]
+  fps: 30
+  outputDir: ./output
+
+generation:
+  model: v6
+  referenceModel: v6
+  quality: 720p
+  upscale: true
+  generateAudio: false
+  image:
+    enabled: true
+    model: gemini-3.1-flash
+    quality: 1080p
+  prompt:
+    base: A talking character derived from the provided character image, speaking directly to camera in a photoreal live-action environment with realistic depth and polished cinematic lighting
+```
+
+既定では `generation.image.enabled: true` で、PixVerse `create image` を使ってベース静止画を作ってから I2V に渡す。添付画像が 1 枚でも複数枚でもこのフローを優先し、通常動画の `generation.model` は `v6` を維持する。`generation.image.model` は PixVerse CLI の image model 名で、この workflow の既定値は `gemini-3.1-flash` の `1080p`。PixVerse CLI 1.2.7 の全モデル表は `references/model-support.md` を参照。`generation.image.prompt` が未指定なら `generation.prompt` を使う。`source: reference` は既定で `generation.referenceModel: v6` を使う。`generateAudio: true` は CLI の `--audio`、既定の `false` は `--no-audio` に対応する。`text` がある `generated` / `reference` clip は `create voice` でナレーション音声を作り、特定声が必要な場合は `voiceId` を指定する。
+
+`project.yaml` がない場合 → `references/interactive-questions.md` のフローでヒアリング。
+
+### Clip Semantics
+
+- `source: generated` — requires `text` or `audioFile`; pipeline runs direct I2V or `create image` → I2V, then adds narration through `create voice` or `audioFile`
+- `source: video` — requires `asset`, uses local file in Remotion
+- `source: image` — requires `asset`, renders as still/endcard
+- `source: reference` — only use when the user explicitly wants story / teaser / trailer / multi-cut behavior
+
+Optional: `overlayText`, `overlayStyle`, `voiceId`, `audioFile`, `hasAudio`
+
+---
+
+## Mode C: Reference Story Workflow
+
+ストーリー型の依頼では、キャラを各カットで直接リファレンスしながら別シーンを個別生成し、`source: reference` クリップとして pipeline に流す。1 枚でも複数枚でも使えるが、既定動作にはせず、story / teaser / trailer / multi-cut の明示指示がある場合に限る。
+
+```
+キャラ画像 (1-7枚)
+    ▼
+Phase 1: 3-5個のストーリービートを設計
+    ▼
+Phase 2: 各ビートを `pixverse create reference --images` で個別生成
+    ▼
+Phase 3: 各カットの `text` を `pixverse create voice` で音声化する、または `audioFile` を使う
+    ▼
+Phase 4: pipeline 内で download / sound / upscale を処理
+    ▼
+Phase 5: `manifest.render.json` を組み、BGM・テロップ付きで render
+    ▼
+完成動画 (.mp4)
+```
+
+### When Mode C Is The Default
+
+- ユーザーが「物語」「ティザー」「トレーラー」「マルチカット」「このキャラを主人公に」と言ったとき
+- シーンごとに背景、カメラ、演出を大きく変えたいとき
+- 1言語でも、映像体験を優先したいとき
+
+### Story Construction Rules
+
+1. 3-5 カットで組む
+2. 各カットに明確な役割を持たせる
+3. 各カットごとに `camera work` を変える
+4. ナレーションは 1 カット 1 文までに圧縮する
+5. 最終 `project.yaml` はまず `source: reference` を使う。ローカル素材が確定している場合だけ `source: video` に落とす
+
+### PixVerse Per-Cut Generation
+
+```bash
+pixverse create reference \
+  --images [キャラ画像1..n] \
+  --prompt "[シーン説明]. [キャラの動き]. [背景の動き]. [カメラワーク]." \
+  --aspect-ratio 9:16 \
+  --model v6 \
+  --duration [4-6] \
+  --quality 720p \
+  --no-audio \
+  --no-wait --json
+```
+
+注意:
+- `pixverse create reference --images` は 1-7 枚で使える
+- PixVerse CLI 1.2.7 の `create reference` は `v6` 対応。既定は `v6`、必要に応じて `pixverse-c1` へ上書きできる
+- ただし pipeline config の `speaker.mode=reference` は 2-7 枚必須
+- 画像が1枚でも複数枚でも、明示的に story / teaser / trailer / multi-cut を求められた場合だけ `source: reference` を使う
+- `speaker.mode: reference` を使うのは、reference-driven workflow を明示したい場合だけ
+
+### Final Timeline Config Pattern
+
+```yaml
+speaker:
+  name: My Character
+  images:
+    - ./assets/character.png
+  mode: single
+
+locales:
+  ja:
+    bgm: ./assets/bgm.mp3
+    bgmVolume: 0.35
+    clips:
+      - id: beat-01
+        source: reference
+        prompt: The same character from the reference image steps into a moonlit shrine path, slow push in, vertical portrait framing.
+        text: 物語が動き出す。
+        durationSeconds: 4
+        overlayText: 物語の始まり
+        overlayStyle: subtitle
+        hasAudio: true
+      - id: beat-02
+        source: reference
+        prompt: The same character from the reference image turns toward camera as the gate glows behind them, gentle orbit shot.
+        durationSeconds: 4
+        overlayText: 目覚める力
+        overlayStyle: subtitle
+```
+
+Mode C では `./bin/pipeline run --config <story.yaml>` を使い、`referenceJobs` を含む PixVerse 生成と Remotion 編集の両方が走る。すでにローカル `video` 素材だけで組んでいる場合だけ `render` を使う。
+
+### Core Commands
+
+```bash
+cd remotion
+./bin/pipeline validate --config <path>
+./bin/pipeline plan --config <path>
+./bin/pipeline run --config <path> [--dry-run] [--run-id <id>]
+./bin/pipeline story --image <path> [--config-out <path>] [--dry-run] [--run]
+./bin/pipeline render --config <path> --lang <lang> --ratio <ratio> [--run-id <id>]
+```
+
+`pnpm pipeline:*` も使えるが、PATH が不安定な場合は `./bin/pipeline` を使う。
+
+### Pipeline Workflow
+
+1. Load and normalize config
+2. Validate schema and file paths
+3. Plan variants and job counts
+4. Optionally generate base images per aspect ratio (`generation.image.enabled=true` の場合)
+5. Generate base videos per aspect ratio (generated clips exist の場合)
+6. Generate per-cut reference videos (`source: reference` がある場合)
+7. Generate voice audio per generated or reference clip that has `text`
+8. Optionally run sound and upscale
+9. Download generated assets
+10. Build `manifest.render.json` per variant
+11. Render final `character.mp4` with Remotion
+12. Write top-level `manifest.json`
+
+### Legacy Compatibility
+
+`spokesperson.yaml` は自動正規化:
+- `announcement.topic/date` → `project.title/date`
+- `scripts.<lang>` → `locales.<lang>.clips[0]`
+- `output.*` → `render.*` / `generation.*`
+- `prompt.*` → `generation.prompt.*`
+
+---
+
+## PixVerse Commands Reference
+
+| Command | Purpose |
+|---------|---------|
+| `pixverse account info --json` | Credit check |
+| `pixverse create image` | Base still image generation |
+| `pixverse create video --image` | Base video from one image |
+| `pixverse create reference --images` | Base video from multiple images |
+| `pixverse create voice --text` | TTS narration audio asset |
+| `audioFile` in `project.yaml` | Pre-recorded narration audio |
+| `pixverse create video --audio` / `--no-audio` | Optional generated audio switch |
+| `pixverse create upscale --quality` | Optional final upscale |
+| `--idempotency-key` | Passed automatically by pipeline `run` for retry-safe create jobs |
+| `pixverse task wait <id> --type image\|video --json` | Wait for async jobs |
+| `pixverse asset download <id> --dest <dir> --type image\|video --json` | Download generated image/video |
+
+## Validation Checklist
+
+- `speaker.images` is 1-7 files
+- `generated` clips have `text` or `audioFile`
+- `reference` clips have `prompt`
+- `video` / `image` clips have `asset`
+- `render.aspectRatios` only uses supported ratios
+- all local file references exist before execution
+
+## Output Layout
+
+```text
+output/<project-slug>/<run-id>/
+  manifest.json
+  <lang>/<ratio>/
+    manifest.render.json
+    character.mp4
+    assets/*
+```
+
+Remotion staging assets → `remotion/public/.pipeline/`
+
+## Example: 20秒プロモ動画
+
+| # | 秒数 | ショット | カメラ | ナレーション | hasAudio |
+|---|------|---------|-------|------------|----------|
+| 1 | 4s | 背中ショット（フック） | tracking follow | なし（BGMのみ） | false |
+| 2 | 4s | キャビン/書斎 | slow push in | 自己紹介 | true |
+| 3 | 5s | スタジオ | static MCU | 番組説明 | true |
+| 4 | 4s | 花畑/屋外 | slow dolly out | CTA | true |
+| 5 | 3s | エンドカード | — | URL表示 | false |
+
+## Example: 15秒ストーリーティザー
+
+| # | 秒数 | ビート | カメラ | ナレーション | 実行方式 |
+|---|------|--------|--------|--------------|----------|
+| 1 | 3-4s | 封印のきしみ | lateral tracking | 夜の社で、封印が軋みはじめる | `create reference` |
+| 2 | 3-4s | 術師の目覚め | slow push in | 呪符の術師が、静かに目を開く | `create reference` |
+| 3 | 3-4s | 一札の斬撃 | tracking follow | 一枚の札が、闇を切り裂く | `create reference` |
+| 4 | 3-4s | 門が開く | orbit → pull back | 結界の向こうへ、物語が動き出す | `create reference` |
+
+## Dependencies
+
+| ツール | 用途 |
+|--------|------|
+| PixVerse CLI (`pixverse create image`) | 3面図 + カット画像生成 (Mode A / B) |
+| PixVerse CLI (`pixverse create video`) | I2V 動画生成 |
+| PixVerse CLI (`pixverse create reference`) | 複数画像からの reference 動画生成 |
+| PixVerse CLI (`pixverse create voice`) | ナレーション音声生成 |
+| Remotion | 編集・レンダリング |
+| `short-video-editing` スキル | 構成設計・レビュー |
+| `remotion-best-practices` スキル | Remotion コード |
+| `pixverse-ai-image-and-video-generator` スキル | PixVerse CLI 全リファレンス |
+
+## Reference Files
+
+- `references/interactive-questions.md` — project.yaml なしの対話ヒアリングフロー
+- `references/prompt-library.md` — プロンプト構築ガイド + カメラワーク語彙 + スタイルテンプレート
+- `references/model-support.md` — PixVerse CLI / 公式 skill 由来の最新モデル表
+- `references/model-routing.md` — 目的別の workflow / model candidate / optional surface の選び方
+- `references/pixverse-best-practices.md` — CLI command family / V6 / C1 candidate / batch / asset / audio / regeneration の実務メモ
+- `references/credit-estimation.md` — job count と stage 別クレジット概算、実測較正ルール
+- `references/exit-codes.md` — PixVerse CLI exit code と retry / stop 契約
+- `references/lesson-codification.md` — run の教訓を `references/` に成文化するパターン
+- `references/final-video-qa-gate.md` — 生成完了と採用判定を分ける QA gate
+- `agents/pixverse-production-agents.md` — Coordinator / Model Router / Prompt Designer / QC などの役割分担
+- `references/pipeline-diagram.md` — パイプライン Mermaid フローチャート + ジョブ数計算式
+- `references/manifest-schema.md` — Creative / Pipeline 両 manifest の JSON スキーマ

@@ -1,0 +1,110 @@
+{
+  "fixture_kind": "neutralized_contract",
+  "source": "https://github.com/PixVerseAI/cli/blob/86d5ec07f33c7ab8e503019b8f6161f698e042a0/dist/index.js",
+  "note": "info and response objects are synthetic contract exercises using exact official field names; they are not raw live responses. live_read_contract preserves types, constraints, counts, dimensions, duration and quote from a successful read on 2026-10-16, with template/media/author/account IDs, names and URLs omitted or pseudonymized.",
+  "info": {
+    "template_id": 12345,
+    "display_name": "Neutral ordered template",
+    "template_source": 21,
+    "template_type": 1,
+    "effect_type": "2",
+    "fixed_cost": 220,
+    "input_fields": [
+      {
+        "name": "Optional image",
+        "content_type": "image",
+        "node_id": "fixture-optional",
+        "required": false,
+        "max_size": 31457280
+      },
+      {
+        "name": "Required image",
+        "content_type": "image",
+        "node_id": "fixture-required",
+        "required": true,
+        "max_size": 31457280
+      },
+      {
+        "name": "Text",
+        "content_type": "text",
+        "node_id": "fixture-text",
+        "required": false
+      }
+    ],
+    "output": [
+      {
+        "type": "video",
+        "width": 720,
+        "height": 1280,
+        "duration": 10
+      }
+    ]
+  },
+  "submission_response": {
+    "outputs": [
+      {
+        "media_id": 111,
+        "media_type": "video"
+      },
+      {
+        "media_id": 112,
+        "media_type": "image"
+      }
+    ]
+  },
+  "partial_response": {
+    "error": "Neutral invalid sibling output fixture",
+    "response": {
+      "outputs": [
+        {
+          "media_id": 111,
+          "media_type": "video"
+        },
+        {
+          "media_id": "invalid",
+          "media_type": "image"
+        }
+      ]
+    },
+    "valid_outputs": [
+      {
+        "media_id": 111,
+        "media_type": "video"
+      }
+    ]
+  },
+  "source_commit": "86d5ec07f33c7ab8e503019b8f6161f698e042a0",
+  "source_sha256": "ad2cef6c3b26157aa00125f8393346faa4fab97b631479093c3c0c99b31a5d54",
+  "live_read_contract": {
+    "template_source": 21,
+    "template_type": 1,
+    "effect_type": "2",
+    "fixed_cost": 220,
+    "input_fields": [
+      {
+        "name": "Neutral image 1",
+        "content_type": "image",
+        "node_id": "fixture-live-image-1",
+        "required": true,
+        "max_size": 31457280
+      },
+      {
+        "name": "Neutral image 2",
+        "content_type": "image",
+        "node_id": "fixture-live-image-2",
+        "required": true,
+        "max_size": 31457280
+      }
+    ],
+    "output": [
+      {
+        "type": "video",
+        "width": 720,
+        "height": 1280,
+        "duration": 10
+      }
+    ],
+    "cli_version": "1.4.9",
+    "observed_date": "2026-10-16"
+  }
+}

@@ -1,142 +1,32 @@
-# AGENTS.md
+# Agent entry point
 
-This repository is designed to work with both Codex and Claude Code.
-The runtime itself is tool-agnostic: all execution goes through `project.yaml` and `remotion/./bin/pipeline`.
+The current operating contract is [`SKILL.md`](SKILL.md), with [`references/production-v1.md`](references/production-v1.md) for commands and migration. Read `VISION.md` and `CHECKS.md`; use `LOOPS.md` for repeated work, `DECISIONS.md` for durable decisions and `NEXT_ACTIONS.md` for unresolved work.
 
-This file is also the operating entrypoint for AI agents working in this repo. Keep the PixVerse execution rules below intact, and use the project operating files to preserve context across sessions.
+## Current architecture
 
-This is a public OSS repository. Write operating notes as contributor-facing documentation, not private memory.
+- Character Pipeline owns adopted revisions of identity/body, outfit, voice, world/place and props. Shotpack owns sequence, take adoption, timeline, issues and delivery.
+- Shared code is canonical in Shotpack's `production-core/` and vendored identically into Character Pipeline. Do not create another generation/budget/resume engine. Synchronize the vendored copy and verify hashes when changing the core.
+- New work uses JSON `production.v1` and root `./bin/production`, Node >=22.18 with built-in SQLite and no new npm dependencies. The previous YAML/Remotion entry is legacy opt-in only. Archived `references/legacy-*.md` and older role/workflow files do not override current contracts.
+- Use one production coordinator and one backend owner for each intent. The two entries must use the same explicit `--db` path when handling one production. Do not run old and new paid workflows concurrently.
 
-## First Things To Read
+## Before editing or executing
 
-- `VISION.md`
-- `CHECKS.md`
-- `LOOPS.md`
-- `DECISIONS.md`
-- `NEXT_ACTIONS.md`
-- `README.md` or `README.ja.md`
-- `SKILL.md`
-- `references/interactive-questions.md`
+1. Read `git status --short`, preserve existing user changes, and check free storage before copying assets or installing anything. Do not remove files/caches to gain space.
+2. Make a concise plan and choose the smallest meaningful local checks. Validation, plan and `run --dry-run` make no provider generation calls. Offline core use does not require npm installation or authentication changes.
+3. Paid work needs the human's concrete approved target, retry limit and upper credits, recorded against the resolved plan. Unknown cost/context/capability blocks generation. `approve` records existing human permission; it never authorizes work by itself. Honor valid scope without unnecessary repeat prompts.
+4. Never verify code or documents by spending credits unless the human approved that trial. Do not create OAuth grants, expand permissions, publish, push, merge or distribute packages unless explicitly requested.
 
-Read only the sections needed for the request, but do not skip `CHECKS.md` before any command that can write output or spend credits.
+## Runtime invariants
 
-## Project Operating Loop
+- Immutable adopted entity revisions; retain provenance, hashes and region/workspace. Keep provider IDs as strings and times as integer milliseconds.
+- Intent hashes reflect every resolved request input and intentional attempt. Same shot ID is not a cache key for changed content. Explicit `false` must reach the provider as off.
+- Reserve costs and persist submitting state before network submission. Keep partial IDs on nonzero exits; reconcile uncertain submission instead of resubmitting. Download failure never becomes a new generation request. Voice/music trace IDs do not imply deduplication.
+- Separate completion, download, QA and acceptance. Preserve rejected takes and adoption history. Scope invalidation to affected dependencies; stale does not authorize regeneration.
+- Read current Canvas graph/capabilities; validate scoped changes, merge base/local/remote and preserve human choices, layout, unmanaged nodes and large IDs. Report conflicts. Do not send undeclared fields or secretly fail over to Create.
+- Return real adopted, checked files and report unresolved costs/QA. Never represent a dry-run path or missing manifest asset as a finished MP4. TTS overlaid on video is narration, not proven lip sync.
 
-Use this loop for non-trivial work:
+## Contributor checks and reporting
 
-1. Understand the request and read the nearest source files.
-2. Check `VISION.md` for project intent and boundaries.
-3. Pick a loop from `LOOPS.md` when the task matches a repeated workflow.
-4. Make a short plan before editing or running commands.
-5. Use `CHECKS.md` before validation, dry-run, render, submission, or PixVerse generation.
-6. Record lasting decisions in `DECISIONS.md`.
-7. Record unresolved follow-ups in `NEXT_ACTIONS.md`.
-8. When a run yields a reusable operational lesson, codify it into `references/` via Loop 10. Do not leave durable rules only in chat or private memory.
+Test changes with neutral fixtures and fault cases relevant to the edit: resume/duplicate submission, concurrent budget reservation, explicit OFF, QA failure, missing files, Canvas conflict and context mismatch. Mock success is contract evidence only. Run supported existing local finishing tests without fetching new production assets.
 
-Do not turn every small task into heavy process. For a typo or a narrow docs fix, read the relevant file, patch it, and report the result.
-
-## Operating File Roles
-
-- `VISION.md`: project purpose, audience, values, scope, and success definition.
-- `CHECKS.md`: pre-flight, dry-run, render, public submission, and PixVerse credit checks.
-- `LOOPS.md`: repeatable workflows for announcement videos, reference stories, local render, CLI refresh, submission, content repurposing, run review, and lesson codification.
-- `DECISIONS.md`: append-only record of decisions that should survive the current session.
-- `NEXT_ACTIONS.md`: current backlog and blocked items for the next agent or human operator.
-- `references/`: public-safe operational truth. Prefer updating these over accumulating private session notes.
-
-Update these files only when the change is meant to affect future sessions. Keep temporary notes in the final response or ignored `output/` files.
-
-## Open Source Safety
-
-- Do not commit PixVerse account data, tokens, credit balances, private paths, or private client/event details.
-- Do not promote raw `output/` or `output/runs/` logs into tracked docs without summarizing and removing private context.
-- Promote reusable lessons into `references/` as generalized rules, tables, or checklists. Keep unfinished work in `NEXT_ACTIONS.md`.
-- Keep `NEXT_ACTIONS.md` public-safe. Use GitHub Issues for external collaboration when an item becomes a real public task.
-- Keep content repurposing loops optional and generalized; this repo's core is the PixVerse character pipeline.
-- When in doubt, prefer generic examples and neutral fixtures.
-
-## Required Local Setup
-
-```bash
-cd remotion
-pnpm install
-pixverse auth login
-```
-
-`pnpm install` installs the repo-pinned PixVerse CLI (`pixverse@^1.2.7`). If `PIXVERSE_BIN` is set, it wins; otherwise `./bin/pipeline` prefers `remotion/node_modules/.bin/pixverse` and then `pixverse` on `PATH`.
-
-## Request Router
-
-- Announcement / multilingual batch: use `source: generated` clips and the shared I2I -> I2V flow.
-- Story / teaser / trailer / multi-cut: draft 3-5 beats and use `source: reference` per cut.
-- Existing local assets only: use `source: video` / `source: image` and `render`.
-- Legacy config: load `spokesperson.yaml`, normalize it, then use the standard workflow.
-
-## Standard Workflow
-
-1. Turn the user request into `project.yaml`
-2. Run `./bin/pipeline validate --config <path>`
-3. Run `./bin/pipeline plan --config <path>`
-4. Run `./bin/pipeline run --config <path> --dry-run`
-5. Run `./bin/pipeline run --config <path>` or `render`
-
-## Clip Modes
-
-- `generated`: shared I2V pipeline. Can create PixVerse voice audio from `text`, use `audioFile`, or be silent.
-- `reference`: per-cut PixVerse reference generation for story / teaser / trailer workflows. Uses `generation.referenceModel` (`v6` by default; `pixverse-c1` is still a valid override).
-- `video` / `image`: local assets only.
-
-## Credit Boundary
-
-- Safe to run before approval: `validate`, `plan`, `run --dry-run`, and local-only `render`.
-- Requires explicit user approval: `run` without `--dry-run`, because it can submit PixVerse jobs and consume credits.
-- Before batch generation, report planned variants, image/base/reference/voice/upscale job counts, and any obvious credit or slot risk.
-- Use `references/credit-estimation.md` for planning estimates. Runtime still uses a coarse job-count gate; agents must report the better estimate before approval.
-- Full `run` passes deterministic PixVerse `--idempotency-key` values scoped by project/run-id/variant/stage to reduce duplicate credit spend on retries.
-- Retry and exit handling for direct CLI work follows `references/exit-codes.md`.
-- Never run PixVerse generation just to verify documentation changes.
-- After a substantial run, use Loop 10 / `references/lesson-codification.md` to calibrate credit rows, exit handling, prompt rules, or QA hard-fails when the learning is reusable.
-
-## Recommended Sub-Agent Split
-
-- Coordinator:
-  owns `project.yaml`, chooses the mode, and is the only agent allowed to run the final `run` / `render`.
-- Story Designer:
-  breaks story requests into 3-5 beats and writes prompts for `source: reference` clips.
-- Planner / Reviewer:
-  runs `validate`, `plan`, and optionally `run --dry-run`, then reports job counts and risks.
-- Output QA:
-  checks `manifest.json`, output variants, durations, and final files after execution.
-
-## Coordination Rules
-
-- Only one agent edits `project.yaml`.
-- Only one agent runs the final PixVerse mutation step for a given config or `run-id`.
-- Parallel workers should stay read-only or dry-run-only unless the coordinator explicitly hands off ownership.
-- Do not assume ElevenLabs. Narration comes from PixVerse `create voice` audio assets or from `audioFile`.
-
-## Final Report Template
-
-When a run or dry-run finishes, report:
-
-- Config path and run-id
-- Variant count and job counts
-- Credit estimate from `references/credit-estimation.md` when generation is involved
-- Output root and final MP4 paths, when rendered
-- `manifest.json` path
-- Any failed/skipped variant and exact error string
-- Any reusable lesson promoted into `references/`
-
-When documentation or operating files change, report:
-
-- Files changed
-- Whether PixVerse generation was avoided
-- Verification performed, or why it was not needed
-- Any follow-up added to `NEXT_ACTIONS.md`
-- Any lesson codified into `references/`
-
-## Tool Notes
-
-- Codex users should rely on this `AGENTS.md`.
-- Claude Code users should rely on `CLAUDE.md`.
-- `.claude/launch.json` and `.claude/settings.local.json` are optional local helpers, not runtime requirements.
+Report changed files, checks/results, real deliverables, unchanged authorization boundaries, unverified provider/creative behavior and remaining blockers. Record durable operating lessons publicly in generalized form; keep tokens, account state, private paths/media and raw production logs out of tracked files. Do not change unrelated work.

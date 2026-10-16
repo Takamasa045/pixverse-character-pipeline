@@ -1,0 +1,145 @@
+{
+  "schema_version": "production.v1",
+  "project_id": "weekly-guide",
+  "revision": 1,
+  "context": {
+    "region": "global",
+    "workspace_id": "0"
+  },
+  "brief": {
+    "original": "いつもの案内キャラで20秒。日本語・英語、縦横。ナレーション。",
+    "intent": "サービスの用途を説明",
+    "assumptions": [
+      "Attach previously accepted character/voice revisions before production"
+    ],
+    "deliveries": [
+      {
+        "id": "ja-16-9",
+        "locale": "ja",
+        "aspect": "16:9",
+        "duration_ms": 20000,
+        "width": 640,
+        "height": 360
+      },
+      {
+        "id": "ja-9-16",
+        "locale": "ja",
+        "aspect": "9:16",
+        "duration_ms": 20000,
+        "width": 360,
+        "height": 640
+      },
+      {
+        "id": "en-16-9",
+        "locale": "en",
+        "aspect": "16:9",
+        "duration_ms": 20000,
+        "width": 640,
+        "height": 360
+      },
+      {
+        "id": "en-9-16",
+        "locale": "en",
+        "aspect": "9:16",
+        "duration_ms": 20000,
+        "width": 360,
+        "height": 640
+      }
+    ]
+  },
+  "entities": [],
+  "assets": [],
+  "shots": [
+    {
+      "shot_id": "intro",
+      "purpose": "サービスの約束を一言で提示",
+      "prompt": "サービスの約束を一言で提示",
+      "edit_duration_ms": 4000,
+      "camera": "medium",
+      "entry_state": {
+        "location": "studio"
+      },
+      "exit_state": {
+        "location": "studio"
+      },
+      "audio": {
+        "intent": "narration",
+        "same_voice": true,
+        "visible_mouth": false
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "use",
+      "purpose": "具体的な利用場面を見せる",
+      "prompt": "具体的な利用場面を見せる",
+      "edit_duration_ms": 6000,
+      "camera": "over shoulder",
+      "entry_state": {
+        "location": "studio"
+      },
+      "exit_state": {
+        "location": "studio"
+      },
+      "audio": {
+        "intent": "narration",
+        "same_voice": true,
+        "visible_mouth": false
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "benefit",
+      "purpose": "利用前後の変化を伝える",
+      "prompt": "利用前後の変化を伝える",
+      "edit_duration_ms": 6000,
+      "camera": "detail",
+      "entry_state": {
+        "location": "studio"
+      },
+      "exit_state": {
+        "location": "studio"
+      },
+      "audio": {
+        "intent": "narration",
+        "same_voice": true,
+        "visible_mouth": false
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    },
+    {
+      "shot_id": "close",
+      "purpose": "次の行動を案内",
+      "prompt": "次の行動を案内",
+      "edit_duration_ms": 4000,
+      "camera": "wide",
+      "entry_state": {
+        "location": "studio"
+      },
+      "exit_state": {
+        "location": "studio"
+      },
+      "audio": {
+        "intent": "narration",
+        "same_voice": true,
+        "visible_mouth": false
+      },
+      "references": [],
+      "generation_strategy": "editable_shot"
+    }
+  ],
+  "execution_policy": {
+    "allowed_scope": "planning_only",
+    "max_credits": null,
+    "max_attempts": 1
+  },
+  "timeline": {
+    "fps": 30,
+    "clips": [],
+    "audio": [],
+    "captions": []
+  }
+}

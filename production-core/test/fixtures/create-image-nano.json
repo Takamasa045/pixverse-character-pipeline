@@ -1,0 +1,229 @@
+{
+  "schema_version": "pixverse_create_capability_query.v1",
+  "source": "bundled",
+  "query": {
+    "mode": "image",
+    "model": "gemini-nano-banana-2.1"
+  },
+  "capability": {
+    "capability_id": "create.image",
+    "command": "pixverse create image",
+    "description": "Create an image from text and optional reference images.",
+    "default_model": "gpt-image-2.5-flare",
+    "parameters": {
+      "prompt": {
+        "flag": "--prompt",
+        "type": "text",
+        "required": true,
+        "accepts": [
+          "literal",
+          "local_file",
+          "stdin"
+        ],
+        "on_invalid": "reject",
+        "description": "Generation prompt."
+      },
+      "image": {
+        "flag": "--image",
+        "type": "media",
+        "required": false,
+        "accepts": [
+          "local_path",
+          "https_url",
+          "asset_id",
+          "media_path"
+        ],
+        "on_invalid": "reject",
+        "description": "Single reference image."
+      },
+      "images": {
+        "flag": "--images",
+        "type": "media_list",
+        "required": false,
+        "accepts": [
+          "local_path",
+          "https_url",
+          "asset_id",
+          "media_path"
+        ],
+        "max_count": 14,
+        "on_invalid": "reject",
+        "description": "Multiple reference images; limits depend on the selected model."
+      },
+      "model": {
+        "flag": "--model",
+        "type": "string",
+        "required": false,
+        "default": "gemini-nano-banana-2.1",
+        "enum": [
+          "gemini-nano-banana-2.1"
+        ],
+        "on_invalid": "reject",
+        "description": "Image generation model."
+      },
+      "quality": {
+        "flag": "--quality",
+        "type": "string",
+        "required": false,
+        "default": "1080p",
+        "unit": "output_resolution",
+        "on_invalid": "adjust",
+        "description": "Output quality.",
+        "enum": [
+          "1080p",
+          "1440p",
+          "2160p"
+        ]
+      },
+      "aspect_ratio": {
+        "flag": "--aspect-ratio",
+        "type": "string",
+        "required": false,
+        "default": "16:9",
+        "unit": "width:height",
+        "on_invalid": "adjust",
+        "description": "Output framing.",
+        "enum": [
+          "auto",
+          "1:1",
+          "3:2",
+          "2:3",
+          "3:4",
+          "4:3",
+          "4:5",
+          "5:4",
+          "9:16",
+          "16:9",
+          "21:9",
+          "1:4",
+          "4:1",
+          "1:8",
+          "8:1"
+        ]
+      },
+      "detail_level": {
+        "flag": "--detail-level",
+        "type": "string",
+        "required": false,
+        "supported": true,
+        "on_invalid": "reject",
+        "description": "Image detail level; accepted values and defaults depend on model.",
+        "default": "medium",
+        "enum": [
+          "minimal",
+          "medium",
+          "high"
+        ]
+      },
+      "count": {
+        "flag": "--count",
+        "type": "integer",
+        "required": false,
+        "default": 1,
+        "min": 1,
+        "max": 4,
+        "unit": "count",
+        "on_invalid": "adjust",
+        "description": "Number of generation results."
+      },
+      "seed": {
+        "flag": "--seed",
+        "type": "integer",
+        "required": false,
+        "on_invalid": "reject",
+        "description": "Accepted silently but omitted from the request.",
+        "default": null
+      },
+      "idempotency_key": {
+        "flag": "--idempotency-key",
+        "type": "string",
+        "required": false,
+        "on_invalid": "backend",
+        "description": "Caller-provided key for safe request retries."
+      },
+      "wait": {
+        "flag": "--no-wait",
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "description": "Wait for the generated asset unless disabled."
+      },
+      "timeout": {
+        "flag": "--timeout",
+        "type": "integer",
+        "required": false,
+        "default": 300,
+        "min": 1,
+        "unit": "seconds",
+        "on_invalid": "reject",
+        "description": "Polling timeout when waiting for completion."
+      },
+      "json": {
+        "flag": "--json",
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "Write pure JSON to stdout."
+      }
+    },
+    "models": {
+      "gemini-nano-banana-2.1": {
+        "id": "gemini-nano-banana-2.1",
+        "display_name": "Nano Banana 2.1",
+        "parameters": {
+          "quality": {
+            "enum": [
+              "1080p",
+              "1440p",
+              "2160p"
+            ],
+            "default": "1080p",
+            "on_invalid": "adjust"
+          },
+          "aspect_ratio": {
+            "enum": [
+              "auto",
+              "1:1",
+              "3:2",
+              "2:3",
+              "3:4",
+              "4:3",
+              "4:5",
+              "5:4",
+              "9:16",
+              "16:9",
+              "21:9",
+              "1:4",
+              "4:1",
+              "1:8",
+              "8:1"
+            ],
+            "default": "16:9",
+            "on_invalid": "adjust"
+          },
+          "images": {
+            "max_count": 14
+          },
+          "count": {
+            "max": 4,
+            "on_invalid": "adjust"
+          },
+          "seed": {
+            "default": null,
+            "description": "Accepted silently but omitted from the request."
+          },
+          "detail_level": {
+            "supported": true,
+            "default": "medium",
+            "enum": [
+              "minimal",
+              "medium",
+              "high"
+            ]
+          }
+        }
+      }
+    },
+    "selected_model": "gemini-nano-banana-2.1"
+  }
+}
